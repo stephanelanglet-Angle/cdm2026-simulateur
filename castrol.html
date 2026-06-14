@@ -400,7 +400,7 @@ function renderDetail(){
   const G=grid(m.home,m.away);
   const style=playerStyle();
   let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Groupe ${m.g}</small></h2>`;
-  h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(0)}% · Nul ${(100*G.pD).toFixed(0)}% · ${m.away} ${(100*G.pA).toFixed(0)}%</b></div>`;
+  h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(1)}% · Nul ${(100*G.pD).toFixed(1)}% · ${m.away} ${(100*G.pA).toFixed(1)}%</b></div>`;
   h+=`<div class="kv"><span>Buts attendus (modèle)</span><b>${G.la.toFixed(2)} – ${G.lb.toFixed(2)}</b></div>`;
   h+=`<div class="note">Scores les plus probables : ${distRow(G)}</div>`;
 
@@ -563,6 +563,8 @@ $('paramBtn').onclick=()=>{ const b=$('paramBox'); b.style.display=b.style.displ
 // relire les paramètres calibrés quand on revient sur l'onglet (depuis la régie)
 window.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncParamsFromMain(); renderAll(); } });
 window.addEventListener('focus', ()=>{ syncParamsFromMain(); renderAll(); });
+// resynchro INSTANTANÉE quand la régie modifie ses paramètres dans un autre onglet
+window.addEventListener('storage', e=>{ if(e.key==='cdm2026_simulateur_state'){ syncParamsFromMain(); renderAll(); } });
 
 /* ======================= INIT ======================= */
 loadLocal();
