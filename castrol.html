@@ -402,6 +402,15 @@ function projectPick(pl, G, style){
   return [ Math.max(0, Math.round(w*ev[0]+(1-w)*styleA)),
            Math.max(0, Math.round(w*ev[1]+(1-w)*styleB)) ];
 }
+// tags des pronos projetés des adversaires (recalcule le style -> reflète les dernières saisies)
+function projTags(G, style){
+  style = style || playerStyle();
+  return PLAYERS.filter(p=>p!==ME).map(pl=>{
+    const pk=projectPick(pl,G,style); if(!pk) return '';
+    const thr = style.st[pl].skill>0.78;
+    return `<span class="tag" style="margin:2px;${thr?'border-color:var(--clay);color:var(--clay)':''}">${pl.split('_')[0]}: ${pk[0]}-${pk[1]}</span>`;
+  }).filter(Boolean).join(' ');
+}
 
 /* ======================= CLASSEMENT ======================= */
 function standings(){
@@ -615,12 +624,9 @@ function renderDetail(){
     h+=`<div class="kv" style="margin-top:10px"><span>Prono à <b>points espérés</b> max</span><span class="pill ev">${ev.pred[0]}-${ev.pred[1]} · ${ev.ev.toFixed(2)} pts</span></div>`;
     const known = PLAYERS.filter(p=>m.preds[p]).length;
     h+=`<div class="note">Pronos déjà saisis pour ce match : <b id="knownCount">${known}/${PLAYERS.length}</b> — entre ceux des autres après le coup d'envoi pour affiner le modèle.</div>`;
-    // projections adversaires (skip inactifs ; menaces en rouge)
+    // projections adversaires (skip inactifs ; menaces en rouge) — rafraîchies en direct à la saisie
     h+=`<div class="note" style="margin-top:8px">Pronos probables des adversaires (projetés selon style <b>+ précision</b>, ⚠️ rouge = menace) :</div>`;
-    h+=`<div style="margin-top:5px">`+ PLAYERS.filter(p=>p!==ME).map(pl=>{
-      const pk=projectPick(pl,G,style); if(!pk) return '';
-      const thr = style.st[pl].skill>0.78;
-      return `<span class="tag" style="margin:2px;${thr?'border-color:var(--clay);color:var(--clay)':''}">${pl.split('_')[0]}: ${pk[0]}-${pk[1]}</span>`; }).filter(Boolean).join(' ')+`</div>`;
+    h+=`<div id="oppProj" style="margin-top:5px">${projTags(G,style)}</div>`;
     // reco gagnante
     h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
        `<button class="btn primary" id="winBtn">Calculer</button></div>`+
@@ -656,7 +662,8 @@ function wireDetail(m,G){
     };
     inp.addEventListener('input', ()=>{ lastDetailInput=Date.now(); save(); });
     inp.addEventListener('change', ()=>{ save(); cloudMaybePush();
-      renderStyle();                        // le modèle de style apprend en direct (#4)
+      renderStyle();                        // tableau de style en bas (apprend en direct)
+      const op=$('oppProj'); if(op) op.innerHTML=projTags(G);   // projections du panneau rafraîchies en direct
       const kEl=document.getElementById('knownCount'); if(kEl) kEl.textContent=PLAYERS.filter(p=>m.preds[p]).length+'/'+PLAYERS.length;
     });
   });
