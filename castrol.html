@@ -217,7 +217,7 @@ function effElo(n){ return (ELO[n]||1700) + (HOSTS.has(n)?P.hostBonus:0); }
 function lambdas(ea,eb){ const s=(ea-eb)/P.divGoals; return [clamp((P.muTotal+s)/2,0.12,6),clamp((P.muTotal-s)/2,0.12,6)]; }
 function poiss(l,n){ const a=[]; let p=Math.exp(-l); for(let k=0;k<=n;k++){a.push(p);p*=l/(k+1);} return a; }
 function grid(home,away){
-  const [la,lb]=lambdas(effElo(home),effElo(away)); const N=8;
+  const [la,lb]=lambdas(effElo(home),effElo(away)); const N=14;  // = régie (somme jusqu'à 14 buts) -> probas identiques
   const pa=poiss(la,N), pb=poiss(lb,N), g=[];
   let modal=[0,0],mp=-1,pH=0,pD=0,pA=0;
   for(let i=0;i<=N;i++){g.push([]);for(let j=0;j<=N;j++){const q=pa[i]*pb[j];g[i][j]=q;
