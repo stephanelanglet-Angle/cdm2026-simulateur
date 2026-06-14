@@ -106,6 +106,12 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 </div>
 
 <div class="card">
+  <h2>Bonus <small>4 pts / bonne réponse · vainqueurs de groupe auto, le reste se saisit au fil du tournoi</small></h2>
+  <div id="bonusActualBox"></div>
+  <div class="tbl-scroll"><table id="bonusTbl"></table></div>
+</div>
+
+<div class="card">
   <h2>Style des adversaires <small>déduit de leurs pronos passés — sert à projeter leurs futurs choix</small></h2>
   <div class="tbl-scroll"><table id="styleTbl"></table></div>
 </div>
@@ -250,6 +256,23 @@ const PRED_PLAYED = {
   'Mike':          {},
 };
 
+// ===== Pronos BONUS (déjà joués) — chaque bonne réponse = 4 points =====
+// tor = équipe du meilleur buteur ; df = 4 demi-finalistes ; gw = vainqueurs des 12 groupes ; champ = champion
+const CONS_GW = {A:'Mexique',B:'Suisse',C:'Brésil',D:'Turquie',E:'Allemagne',F:'Pays-Bas',G:'Belgique',H:'Espagne',I:'France',J:'Argentine',K:'Portugal',L:'Angleterre'};
+function gw(over){ return Object.assign({}, CONS_GW, over||{}); }
+const BONUS_PICKS = {
+  'Martin_Hamburg':{ tor:'France',     df:['Angleterre','Brésil','Espagne','France'],     gw:gw({G:'Egypte'}),                                 champ:'France' },
+  'Sven':          { tor:'France',     df:['Allemagne','Brésil','Espagne','France'],      gw:gw(),                                             champ:'Allemagne' },
+  'Fakhrin':       { tor:'Brésil',     df:['Brésil','Mexique','Tchéquie','Turquie'],      gw:gw({A:'Tchéquie',H:null}),                        champ:'Brésil' },
+  'General':       { tor:'France',     df:['Belgique','Espagne','France','Portugal'],     gw:gw({C:'Maroc',D:'Etats-Unis',E:"Côte d'Ivoire",L:'Croatie'}), champ:'France' },
+  'Frank':         { tor:'Angleterre', df:['Allemagne','Angleterre','Argentine','France'],gw:gw(),                                             champ:'Allemagne' },
+  'Stéphane':      { tor:'Angleterre', df:['Angleterre','Argentine','Espagne','Portugal'],gw:gw({I:'Norvège',K:'Colombie',L:'Croatie'}),       champ:'Portugal' },
+  'Ahmed':         { tor:'Angleterre', df:['Angleterre','Argentine','Espagne','France'],  gw:gw({C:'Maroc',E:"Côte d'Ivoire",F:'Suède'}),      champ:"Côte d'Ivoire" },
+  'Jürgen':        { tor:'Brésil',     df:['Allemagne','Argentine','Espagne','France'],   gw:gw({L:'Croatie'}),                                champ:'Argentine' },
+  'Mike':          { tor:null, df:[], gw:{}, champ:null },
+};
+const BONUS_PT = 4;   // points par bonne réponse bonus
+
 /* ======================= ÉTAT ======================= */
 // Paramètres du modèle : SOURCE UNIQUE = le simulateur principal (localStorage partagé,
 // même origine). Garantit des probas 1N2 strictement identiques entre les deux pages.
@@ -271,6 +294,35 @@ function buildMatches(){
   });
 }
 buildMatches();
+
+// Résultats bonus RÉELS, saisis au fil du tournoi (les vainqueurs de groupe sont auto-calculés).
+let BONUS_ACTUAL = { semis:[null,null,null,null], champ:null, tor:null };
+
+// Classement d'un groupe (si les 6 matchs sont joués) -> équipes triées (pts > diff > marqués)
+function groupTable(g){
+  const ms=MATCHES.filter(m=>m.g===g);
+  if(ms.length<6 || ms.some(m=>!m.res)) return null;
+  const t={}; GROUPS[g].forEach(team=>t[team]={team,pts:0,gf:0,ga:0});
+  ms.forEach(m=>{ const [a,b]=m.res;
+    t[m.home].gf+=a; t[m.home].ga+=b; t[m.away].gf+=b; t[m.away].ga+=a;
+    if(a>b)t[m.home].pts+=3; else if(b>a)t[m.away].pts+=3; else { t[m.home].pts++; t[m.away].pts++; }
+  });
+  return Object.values(t).sort((x,y)=> y.pts-x.pts || (y.gf-y.ga)-(x.gf-x.ga) || y.gf-x.gf || x.team.localeCompare(y.team));
+}
+function actualGroupWinner(g){ const tb=groupTable(g); return tb? tb[0].team : null; }
+
+// Points bonus d'un joueur (4 par bonne réponse)
+function bonusBreakdown(pl){
+  const bp=BONUS_PICKS[pl]; const out={gw:0,df:0,champ:0,tor:0,total:0,detail:[]};
+  if(!bp) return out;
+  Object.keys(GROUPS).forEach(g=>{ const w=actualGroupWinner(g); if(w && bp.gw && bp.gw[g]===w){ out.gw+=BONUS_PT; out.detail.push('vainqueur Gr '+g); } });
+  (BONUS_ACTUAL.semis||[]).filter(Boolean).forEach(team=>{ if(bp.df && bp.df.includes(team)){ out.df+=BONUS_PT; out.detail.push('demi: '+team); } });
+  if(BONUS_ACTUAL.champ && bp.champ===BONUS_ACTUAL.champ){ out.champ+=BONUS_PT; out.detail.push('champion'); }
+  if(BONUS_ACTUAL.tor && bp.tor===BONUS_ACTUAL.tor){ out.tor+=BONUS_PT; out.detail.push('meilleur buteur'); }
+  out.total = out.gw+out.df+out.champ+out.tor;
+  return out;
+}
+function bonusPoints(pl){ return bonusBreakdown(pl).total; }
 
 /* ======================= MOTEUR Elo+Poisson ======================= */
 function clamp(x,a,b){return x<a?a:(x>b?b:x);}
@@ -352,11 +404,11 @@ function projectPick(pl, G, style){
 
 /* ======================= CLASSEMENT ======================= */
 function standings(){
-  const tot={}; PLAYERS.forEach(p=>tot[p]=0);
+  const mp={}; PLAYERS.forEach(p=>mp[p]=0);
   MATCHES.forEach(m=>{ if(!m.res)return;
-    PLAYERS.forEach(pl=>{ const pr=m.preds[pl]; if(pr) tot[pl]+=pts(pr[0],pr[1],m.res[0],m.res[1]); });
+    PLAYERS.forEach(pl=>{ const pr=m.preds[pl]; if(pr) mp[pl]+=pts(pr[0],pr[1],m.res[0],m.res[1]); });
   });
-  const rows=PLAYERS.map(p=>({p,pts:tot[p]})).sort((x,y)=>y.pts-x.pts);
+  const rows=PLAYERS.map(p=>{ const b=bonusPoints(p); return {p, mpts:mp[p], bpts:b, pts:mp[p]+b}; }).sort((x,y)=>y.pts-x.pts);
   let pos=0,last=null,seen=0;
   rows.forEach(r=>{ seen++; if(r.pts!==last){pos=seen;last=r.pts;} r.pos=pos; });
   return rows;
@@ -417,18 +469,16 @@ let selGroup='A', selId=MATCHES.find(m=>!m.res)? MATCHES.find(m=>!m.res).id : 0;
 function fmtPred(p){ return p? p[0]+'-'+p[1] : '—'; }
 function renderStandings(){
   const rows=standings();
-  let h='<thead><tr><th class="pos"></th><th class="l">Joueur</th><th>Points</th><th>Joués</th><th>Restant à jouer</th></tr></thead><tbody>';
-  const playedN = MATCHES.filter(m=>m.res).length;
+  let h='<thead><tr><th class="pos"></th><th class="l">Joueur</th><th>Matchs (P)</th><th>Bonus (B)</th><th>Total (T)</th></tr></thead><tbody>';
   rows.forEach(r=>{
-    const styleN = MATCHES.filter(m=>m.res && m.preds[r.p]).length;
     h+=`<tr class="${r.p===ME?'you':''}"><td class="pos">${r.pos}</td><td class="l">${r.p}${r.p===ME?' ⭐':''}</td>`+
-       `<td class="pts ${r.pos===1?'lead':''}">${r.pts}</td><td class="mono">${styleN}/${playedN}</td>`+
-       `<td class="mono" style="color:var(--faint)">${MATCHES.filter(m=>!m.res).length} matchs</td></tr>`;
+       `<td class="mono">${r.mpts}</td><td class="mono" style="color:var(--gold)">${r.bpts||0}</td>`+
+       `<td class="pts ${r.pos===1?'lead':''}">${r.pts}</td></tr>`;
   });
   h+='</tbody>';
   $('standTbl').innerHTML=h;
   const me=rows.find(r=>r.p===ME), lead=rows[0];
-  $('standCtx').textContent = `tu es ${me.pos}ᵉ à ${lead.pts-me.pts} pt(s) du leader (${lead.p})`;
+  $('standCtx').textContent = `tu es ${me.pos}ᵉ à ${lead.pts-me.pts} pt(s) du leader (${lead.p}) · bonus 4 pts/réponse, à venir`;
 }
 
 const MONTHS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
@@ -558,7 +608,38 @@ function runWin(m,G){
 }
 
 function afterEdit(){ saveLocal(); cloudMaybePush(); renderAll(); }
-function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList(); renderDetail(); renderStyle(); }
+function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList(); renderDetail(); renderStyle(); renderBonus(); }
+
+const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
+function teamSelect(k, val, ph){
+  return `<select class="bsel" data-k="${k}"><option value="">${ph}</option>`+
+    ALL_TEAMS.map(t=>`<option value="${t}" ${t===val?'selected':''}>${t}</option>`).join('')+`</select>`;
+}
+function renderBonus(){
+  // résultats bonus réels
+  const gwLine = Object.keys(GROUPS).sort().map(g=>{ const w=actualGroupWinner(g); return `${g}:<b style="color:${w?'var(--grass)':'var(--faint)'}">${w||'—'}</b>`; }).join('  ');
+  let box=`<div class="note">Vainqueurs de groupe (auto dès qu'un groupe est terminé) : <span class="mono">${gwLine}</span></div>`;
+  box+=`<div class="note" style="margin-top:8px;color:var(--chalk)"><b>Demi-finalistes</b> : `+
+    [0,1,2,3].map(i=>teamSelect('semi'+i, BONUS_ACTUAL.semis[i]||'', 'demi '+(i+1))).join(' ')+`</div>`;
+  box+=`<div class="note" style="margin-top:6px;color:var(--chalk)"><b>Champion</b> : ${teamSelect('champ', BONUS_ACTUAL.champ||'', 'champion')}`+
+    `  &nbsp; <b>Équipe du meilleur buteur</b> : ${teamSelect('tor', BONUS_ACTUAL.tor||'', 'équipe')}</div>`;
+  $('bonusActualBox').innerHTML=box;
+  $('bonusActualBox').querySelectorAll('.bsel').forEach(sel=>sel.onchange=()=>{
+    const k=sel.dataset.k, v=sel.value||null;
+    if(k.indexOf('semi')===0){ BONUS_ACTUAL.semis[+k.slice(4)]=v; }
+    else if(k==='champ'){ BONUS_ACTUAL.champ=v; } else if(k==='tor'){ BONUS_ACTUAL.tor=v; }
+    saveLocal(); cloudMaybePush(); renderStandings(); renderBonus();
+  });
+  // table des pronos bonus de chaque joueur + B
+  let h='<thead><tr><th class="l">Joueur</th><th>Buteur</th><th>Demi-finalistes</th><th>Champion</th><th>Bonus (B)</th></tr></thead><tbody>';
+  PLAYERS.forEach(pl=>{ const bp=BONUS_PICKS[pl]; const br=bonusBreakdown(pl);
+    if(!bp || !bp.tor){ h+=`<tr><td class="l">${pl}</td><td colspan="4" style="color:var(--faint)">aucun bonus joué</td></tr>`; return; }
+    h+=`<tr class="${pl===ME?'you':''}"><td class="l">${pl}${pl===ME?' ⭐':''}</td>`+
+       `<td>${bp.tor||'—'}</td><td style="font-size:12px">${(bp.df||[]).join(', ')}</td>`+
+       `<td>${bp.champ||'—'}</td><td class="pts" style="color:var(--gold)">${br.total}</td></tr>`;
+  });
+  h+='</tbody>'; $('bonusTbl').innerHTML=h;
+}
 
 function renderStyle(){
   const {st}=playerStyle();
@@ -585,11 +666,14 @@ function renderStyle(){
 /* ======================= PERSISTENCE + SYNC ======================= */
 const LS='castrol_legends_state';
 // NB : on NE persiste PAS les paramètres du modèle ici (source unique = simulateur principal)
-function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})) }; }
+function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL }; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
 function applyState(s){
   if(!s) return;
   if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ m.res=sm.res||null; if(sm.preds)m.preds=sm.preds; } }); }
+  if(s.bonus){ BONUS_ACTUAL = { semis: Array.isArray(s.bonus.semis)? s.bonus.semis.slice(0,4) : [null,null,null,null],
+    champ: s.bonus.champ||null, tor: s.bonus.tor||null };
+    while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
 }
 function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
 
