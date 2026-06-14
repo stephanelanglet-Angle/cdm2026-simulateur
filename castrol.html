@@ -402,6 +402,7 @@ function renderDetail(){
   let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Groupe ${m.g}</small></h2>`;
   h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(1)}% · Nul ${(100*G.pD).toFixed(1)}% · ${m.away} ${(100*G.pA).toFixed(1)}%</b></div>`;
   h+=`<div class="kv"><span>Buts attendus (modèle)</span><b>${G.la.toFixed(2)} – ${G.lb.toFixed(2)}</b></div>`;
+  h+=`<div class="note" style="color:var(--faint)">entrées : μ=${P.muTotal.toFixed(2)} · div=${P.divGoals} · hôte=+${P.hostBonus} · Elo eff ${Math.round(effElo(m.home))} / ${Math.round(effElo(m.away))}</div>`;
   h+=`<div class="note">Scores les plus probables : ${distRow(G)}</div>`;
 
   if(m.res){
