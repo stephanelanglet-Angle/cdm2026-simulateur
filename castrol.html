@@ -151,27 +151,103 @@ const GROUPS = {
 const PLAYERS = ['Martin_Hamburg','Sven','Fakhrin','General','Frank','Stéphane','Ahmed','Jürgen','Mike'];
 const ME = 'Stéphane';
 
-// 8 matchs joués (orientation = grille du concours), résultat + pronos des 9 joueurs
-const PLAYED = [
-  { g:'A', home:'Mexique',      away:'Afrique du Sud', res:[2,0] },
-  { g:'A', home:'Corée du Sud', away:'Tchéquie',       res:[2,1] },
-  { g:'B', home:'Canada',       away:'Bosnie',         res:[1,1] },
-  { g:'D', home:'Etats-Unis',   away:'Paraguay',       res:[4,1] },
-  { g:'B', home:'Qatar',        away:'Suisse',         res:[1,1] },
-  { g:'C', home:'Brésil',       away:'Maroc',          res:[1,1] },
-  { g:'C', home:'Haïti',        away:'Écosse',         res:[0,1] },
-  { g:'D', home:'Australie',    away:'Turquie',        res:[2,0] },
+// Traduction des noms (calendrier officiel en anglais -> clés ELO françaises)
+const EN2FR = {
+  'Mexico':'Mexique','South Africa':'Afrique du Sud','South Korea':'Corée du Sud','Czech Republic':'Tchéquie',
+  'Canada':'Canada','Bosnia and Herzegovina':'Bosnie','United States':'Etats-Unis','Paraguay':'Paraguay',
+  'Brazil':'Brésil','Morocco':'Maroc','Australia':'Australie','Turkey':'Turquie','Qatar':'Qatar','Switzerland':'Suisse',
+  'Haiti':'Haïti','Scotland':'Écosse','Ivory Coast':"Côte d'Ivoire",'Ecuador':'Equateur','Germany':'Allemagne','Curaçao':'Curaçao',
+  'Netherlands':'Pays-Bas','Japan':'Japon','Sweden':'Suède','Tunisia':'Tunisie','Saudi Arabia':'Arabie saoudite','Uruguay':'Uruguay',
+  'Spain':'Espagne','Cape Verde':'Cap-Vert','Iran':'Iran','New Zealand':'Nouvelle-Zélande','Belgium':'Belgique','Egypt':'Egypte',
+  'France':'France','Senegal':'Sénégal','Iraq':'Irak','Norway':'Norvège','Argentina':'Argentine','Austria':'Autriche','Algeria':'Algérie','Jordan':'Jordanie',
+  'Ghana':'Ghana','Panama':'Panama','England':'Angleterre','Croatia':'Croatie','Portugal':'Portugal','DR Congo':'RD Congo','Uzbekistan':'Ouzbékistan','Colombia':'Colombie',
+};
+// Calendrier officiel CdM 2026 : 72 matchs de poule {n°, date, groupe, équipes (EN), résultat si joué}
+const SCHEDULE = [
+  {n:1,d:'2026-06-11',g:'A',a:'Mexico',b:'South Africa',res:[2,0]},
+  {n:2,d:'2026-06-11',g:'A',a:'South Korea',b:'Czech Republic',res:[2,1]},
+  {n:3,d:'2026-06-12',g:'B',a:'Canada',b:'Bosnia and Herzegovina',res:[1,1]},
+  {n:4,d:'2026-06-12',g:'D',a:'United States',b:'Paraguay',res:[4,1]},
+  {n:5,d:'2026-06-13',g:'C',a:'Brazil',b:'Morocco',res:[1,1]},
+  {n:6,d:'2026-06-13',g:'D',a:'Australia',b:'Turkey',res:[2,0]},
+  {n:7,d:'2026-06-13',g:'B',a:'Qatar',b:'Switzerland',res:[1,1]},
+  {n:8,d:'2026-06-13',g:'C',a:'Haiti',b:'Scotland',res:[0,1]},
+  {n:9,d:'2026-06-14',g:'E',a:'Ivory Coast',b:'Ecuador'},
+  {n:10,d:'2026-06-14',g:'E',a:'Germany',b:'Curaçao'},
+  {n:11,d:'2026-06-14',g:'F',a:'Netherlands',b:'Japan'},
+  {n:12,d:'2026-06-14',g:'F',a:'Sweden',b:'Tunisia'},
+  {n:13,d:'2026-06-15',g:'H',a:'Saudi Arabia',b:'Uruguay'},
+  {n:14,d:'2026-06-15',g:'H',a:'Spain',b:'Cape Verde'},
+  {n:15,d:'2026-06-15',g:'G',a:'Iran',b:'New Zealand'},
+  {n:16,d:'2026-06-15',g:'G',a:'Belgium',b:'Egypt'},
+  {n:17,d:'2026-06-16',g:'I',a:'France',b:'Senegal'},
+  {n:18,d:'2026-06-16',g:'I',a:'Iraq',b:'Norway'},
+  {n:19,d:'2026-06-16',g:'J',a:'Argentina',b:'Algeria'},
+  {n:20,d:'2026-06-16',g:'J',a:'Austria',b:'Jordan'},
+  {n:21,d:'2026-06-17',g:'L',a:'Ghana',b:'Panama'},
+  {n:22,d:'2026-06-17',g:'L',a:'England',b:'Croatia'},
+  {n:23,d:'2026-06-17',g:'K',a:'Portugal',b:'DR Congo'},
+  {n:24,d:'2026-06-17',g:'K',a:'Uzbekistan',b:'Colombia'},
+  {n:25,d:'2026-06-18',g:'A',a:'Czech Republic',b:'South Africa'},
+  {n:26,d:'2026-06-18',g:'B',a:'Switzerland',b:'Bosnia and Herzegovina'},
+  {n:27,d:'2026-06-18',g:'B',a:'Canada',b:'Qatar'},
+  {n:28,d:'2026-06-18',g:'A',a:'Mexico',b:'South Korea'},
+  {n:29,d:'2026-06-19',g:'C',a:'Brazil',b:'Haiti'},
+  {n:30,d:'2026-06-19',g:'C',a:'Scotland',b:'Morocco'},
+  {n:31,d:'2026-06-19',g:'D',a:'Turkey',b:'Paraguay'},
+  {n:32,d:'2026-06-19',g:'D',a:'United States',b:'Australia'},
+  {n:33,d:'2026-06-20',g:'E',a:'Germany',b:'Ivory Coast'},
+  {n:34,d:'2026-06-20',g:'E',a:'Ecuador',b:'Curaçao'},
+  {n:35,d:'2026-06-20',g:'F',a:'Netherlands',b:'Sweden'},
+  {n:36,d:'2026-06-20',g:'F',a:'Tunisia',b:'Japan'},
+  {n:37,d:'2026-06-21',g:'H',a:'Uruguay',b:'Cape Verde'},
+  {n:38,d:'2026-06-21',g:'H',a:'Spain',b:'Saudi Arabia'},
+  {n:39,d:'2026-06-21',g:'G',a:'Belgium',b:'Iran'},
+  {n:40,d:'2026-06-21',g:'G',a:'New Zealand',b:'Egypt'},
+  {n:41,d:'2026-06-22',g:'I',a:'Norway',b:'Senegal'},
+  {n:42,d:'2026-06-22',g:'I',a:'France',b:'Iraq'},
+  {n:43,d:'2026-06-22',g:'J',a:'Argentina',b:'Austria'},
+  {n:44,d:'2026-06-22',g:'J',a:'Jordan',b:'Algeria'},
+  {n:45,d:'2026-06-23',g:'L',a:'England',b:'Ghana'},
+  {n:46,d:'2026-06-23',g:'L',a:'Panama',b:'Croatia'},
+  {n:47,d:'2026-06-23',g:'K',a:'Portugal',b:'Uzbekistan'},
+  {n:48,d:'2026-06-23',g:'K',a:'Colombia',b:'DR Congo'},
+  {n:49,d:'2026-06-24',g:'C',a:'Scotland',b:'Brazil'},
+  {n:50,d:'2026-06-24',g:'C',a:'Morocco',b:'Haiti'},
+  {n:51,d:'2026-06-24',g:'B',a:'Switzerland',b:'Canada'},
+  {n:52,d:'2026-06-24',g:'B',a:'Bosnia and Herzegovina',b:'Qatar'},
+  {n:53,d:'2026-06-24',g:'A',a:'Czech Republic',b:'Mexico'},
+  {n:54,d:'2026-06-24',g:'A',a:'South Africa',b:'South Korea'},
+  {n:55,d:'2026-06-25',g:'E',a:'Curaçao',b:'Ivory Coast'},
+  {n:56,d:'2026-06-25',g:'E',a:'Ecuador',b:'Germany'},
+  {n:57,d:'2026-06-25',g:'F',a:'Japan',b:'Sweden'},
+  {n:58,d:'2026-06-25',g:'F',a:'Tunisia',b:'Netherlands'},
+  {n:59,d:'2026-06-25',g:'D',a:'Turkey',b:'United States'},
+  {n:60,d:'2026-06-25',g:'D',a:'Paraguay',b:'Australia'},
+  {n:61,d:'2026-06-26',g:'I',a:'Norway',b:'France'},
+  {n:62,d:'2026-06-26',g:'I',a:'Senegal',b:'Iraq'},
+  {n:63,d:'2026-06-26',g:'G',a:'Egypt',b:'Iran'},
+  {n:64,d:'2026-06-26',g:'G',a:'New Zealand',b:'Belgium'},
+  {n:65,d:'2026-06-26',g:'H',a:'Cape Verde',b:'Saudi Arabia'},
+  {n:66,d:'2026-06-26',g:'H',a:'Uruguay',b:'Spain'},
+  {n:67,d:'2026-06-27',g:'L',a:'Panama',b:'England'},
+  {n:68,d:'2026-06-27',g:'L',a:'Croatia',b:'Ghana'},
+  {n:69,d:'2026-06-27',g:'J',a:'Algeria',b:'Austria'},
+  {n:70,d:'2026-06-27',g:'J',a:'Jordan',b:'Argentina'},
+  {n:71,d:'2026-06-27',g:'K',a:'Colombia',b:'Portugal'},
+  {n:72,d:'2026-06-27',g:'K',a:'DR Congo',b:'Uzbekistan'},
 ];
-const PRED0 = {
-  'Martin_Hamburg':[[2,0],[1,1],[1,1],[2,1],[0,2],[1,1],[0,1],[1,2]],
-  'Sven':          [[2,0],[1,1],[1,1],[2,1],[0,2],[2,0],[1,2],[0,2]],
-  'Fakhrin':       [[3,1],[2,3],[1,1],[2,1],[1,3],[4,1],[0,2],[1,3]],
-  'General':       [[3,1],[0,2],[1,1],[2,1],[0,3],[1,2],[0,3],[1,3]],
-  'Frank':         [[2,1],[1,1],[1,2],[2,1],[1,3],[1,1],[1,2],[0,2]],
-  'Stéphane':      [[2,1],[1,1],[1,0],[1,0],[1,0],[1,1],[1,1],[1,2]],
-  'Ahmed':         [[3,1],[1,2],[1,2],[1,0],[1,3],[1,2],[0,2],[1,3]],
-  'Jürgen':        [[3,0],[0,4],[2,3],[0,3],[1,3],[3,1],[0,2],[1,3]],
-  'Mike':          [null,null,null,null,null,null,null,null],
+// Pronos des 9 joueurs sur les 8 matchs joués, clés = numéro de match officiel
+const PRED_PLAYED = {
+  'Martin_Hamburg':{1:[2,0],2:[1,1],3:[1,1],4:[2,1],5:[1,1],6:[1,2],7:[0,2],8:[0,1]},
+  'Sven':          {1:[2,0],2:[1,1],3:[1,1],4:[2,1],5:[2,0],6:[0,2],7:[0,2],8:[1,2]},
+  'Fakhrin':       {1:[3,1],2:[2,3],3:[1,1],4:[2,1],5:[4,1],6:[1,3],7:[1,3],8:[0,2]},
+  'General':       {1:[3,1],2:[0,2],3:[1,1],4:[2,1],5:[1,2],6:[1,3],7:[0,3],8:[0,3]},
+  'Frank':         {1:[2,1],2:[1,1],3:[1,2],4:[2,1],5:[1,1],6:[0,2],7:[1,3],8:[1,2]},
+  'Stéphane':      {1:[2,1],2:[1,1],3:[1,0],4:[1,0],5:[1,1],6:[1,2],7:[1,0],8:[1,1]},
+  'Ahmed':         {1:[3,1],2:[1,2],3:[1,2],4:[1,0],5:[1,2],6:[1,3],7:[1,3],8:[0,2]},
+  'Jürgen':        {1:[3,0],2:[0,4],3:[2,3],4:[0,3],5:[3,1],6:[1,3],7:[1,3],8:[0,2]},
+  'Mike':          {},
 };
 
 /* ======================= ÉTAT ======================= */
@@ -185,28 +261,13 @@ function syncParamsFromMain(){
 }
 syncParamsFromMain();
 
-let MATCHES = [];   // {id,g,home,away,res|null,preds:{player:[a,b]|null}}
+let MATCHES = [];   // {id(=n°),n,date,g,home,away,res|null,preds:{player:[a,b]|null}}
 function buildMatches(){
-  MATCHES = [];
-  let id=0;
-  // joués d'abord
-  PLAYED.forEach((m,i)=>{
+  MATCHES = SCHEDULE.map(s=>{
+    const home = EN2FR[s.a]||s.a, away = EN2FR[s.b]||s.b;
     const preds={};
-    PLAYERS.forEach(pl=>{ preds[pl] = (PRED0[pl] && PRED0[pl][i]) ? PRED0[pl][i].slice() : null; });
-    MATCHES.push({ id:id++, g:m.g, home:m.home, away:m.away, res:m.res.slice(), preds });
-  });
-  // restants : toutes les paires de chaque groupe non encore jouées
-  Object.keys(GROUPS).forEach(g=>{
-    const t=GROUPS[g];
-    const combos=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
-    combos.forEach(([a,b])=>{
-      const set=new Set([t[a],t[b]]);
-      const exists = MATCHES.some(m=>m.g===g && new Set([m.home,m.away]).size===2 && set.has(m.home) && set.has(m.away));
-      if(!exists){
-        const preds={}; PLAYERS.forEach(pl=>preds[pl]=null);
-        MATCHES.push({ id:id++, g, home:t[a], away:t[b], res:null, preds });
-      }
-    });
+    PLAYERS.forEach(pl=>{ const pp=PRED_PLAYED[pl]; preds[pl] = (pp && pp[s.n]) ? pp[s.n].slice() : null; });
+    return { id:s.n, n:s.n, date:s.d, g:s.g, home, away, res: s.res? s.res.slice() : null, preds };
   });
 }
 buildMatches();
@@ -370,19 +431,26 @@ function renderStandings(){
   $('standCtx').textContent = `tu es ${me.pos}ᵉ à ${lead.pts-me.pts} pt(s) du leader (${lead.p})`;
 }
 
+const MONTHS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+function frDate(iso){ if(!iso) return ''; const p=iso.split('-'); return (+p[2])+' '+(MONTHS[+p[1]-1]||''); }
 function renderGroups(){
-  $('groupSel').innerHTML = Object.keys(GROUPS).map(g=>`<button class="gchip ${g===selGroup?'on':''}" data-g="${g}">${g}</button>`).join('');
+  const chips=[{g:'ALL',label:'📅 Calendrier'}].concat(Object.keys(GROUPS).map(g=>({g,label:'Gr '+g})));
+  $('groupSel').innerHTML = chips.map(c=>`<button class="gchip ${c.g===selGroup?'on':''}" data-g="${c.g}">${c.label}</button>`).join('');
   $('groupSel').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{selGroup=b.dataset.g;renderMatchList();});
 }
 function renderMatchList(){
   renderGroups();
-  const ms=MATCHES.filter(m=>m.g===selGroup);
-  $('matchList').innerHTML = ms.map(m=>{
+  // toujours triés par n° de match = ordre calendaire
+  const ms=(selGroup==='ALL'?MATCHES:MATCHES.filter(m=>m.g===selGroup)).slice().sort((x,y)=>x.n-y.n);
+  let html='', lastDate=null;
+  ms.forEach(m=>{
+    if(selGroup==='ALL' && m.date!==lastDate){ html+=`<div class="dayLbl" style="color:var(--faint);font-family:var(--mono);font-size:11.5px;margin:10px 2px 4px">${frDate(m.date)}</div>`; lastDate=m.date; }
     const tag = m.res? `<span class="scoreTag res">${m.res[0]}-${m.res[1]}</span>` : `<span class="scoreTag up">à venir</span>`;
-    return `<button class="mrow ${m.id===selId?'sel':''} ${m.res?'done':''}" data-id="${m.id}">${tag}`+
+    html+=`<button class="mrow ${m.id===selId?'sel':''} ${m.res?'done':''}" data-id="${m.id}">${tag}`+
       `<div class="t">${m.home} <span style="color:var(--faint)">vs</span> ${m.away}</div>`+
-      `<div class="meta">Groupe ${m.g} · Elo ${Math.round(effElo(m.home))} – ${Math.round(effElo(m.away))}</div></button>`;
-  }).join('');
+      `<div class="meta">Match n°${m.n} · ${frDate(m.date)} · Gr ${m.g} · Elo ${Math.round(effElo(m.home))} – ${Math.round(effElo(m.away))}</div></button>`;
+  });
+  $('matchList').innerHTML = html;
   $('matchList').querySelectorAll('.mrow').forEach(b=>b.onclick=()=>{selId=+b.dataset.id;renderMatchList();renderDetail();});
 }
 
@@ -399,7 +467,7 @@ function renderDetail(){
   if(!m){ $('detail').innerHTML='<div class="note">—</div>'; return; }
   const G=grid(m.home,m.away);
   const style=playerStyle();
-  let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Groupe ${m.g}</small></h2>`;
+  let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Match n°${m.n} · ${frDate(m.date)} · Gr ${m.g}</small></h2>`;
   h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(1)}% · Nul ${(100*G.pD).toFixed(1)}% · ${m.away} ${(100*G.pA).toFixed(1)}%</b></div>`;
   h+=`<div class="kv"><span>Buts attendus (modèle)</span><b>${G.la.toFixed(2)} – ${G.lb.toFixed(2)}</b></div>`;
   h+=`<div class="note" style="color:var(--faint)">entrées : μ=${P.muTotal.toFixed(2)} · div=${P.divGoals} · hôte=+${P.hostBonus} · Elo eff ${Math.round(effElo(m.home))} / ${Math.round(effElo(m.away))}</div>`;
