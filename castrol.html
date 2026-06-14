@@ -643,18 +643,21 @@ function wireDetail(m,G){
   const rSave=$('rSave');
   if(rSave) rSave.onclick=()=>{ const a=parseInt($('rA').value,10), b=parseInt($('rB').value,10);
     if(Number.isFinite(a)&&Number.isFinite(b)){ m.res=[a,b]; afterEdit(); } };
-  document.querySelectorAll('.pin').forEach(inp=>{ inp.addEventListener('change',()=>{
-    const pl=inp.dataset.pl;
-    const ins=Array.from(document.querySelectorAll(`.pin`)).filter(x=>x.dataset.pl===pl);
-    const a=parseInt(ins[0].value,10), b=parseInt(ins[1].value,10);
-    if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; }
-    else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; }
-    else { return; }
-    saveLocal(); cloudMaybePush();
-    renderStyle();                          // le modèle de style apprend en direct (#4)
-    const known=PLAYERS.filter(p=>m.preds[p]).length;
-    const kEl=document.getElementById('knownCount'); if(kEl) kEl.textContent=known+'/'+PLAYERS.length;
-  }); });
+  document.querySelectorAll('.pin').forEach(inp=>{
+    const save=()=>{ const pl=inp.dataset.pl;
+      const ins=Array.from(document.querySelectorAll(`.pin`)).filter(x=>x.dataset.pl===pl);
+      const a=parseInt(ins[0].value,10), b=parseInt(ins[1].value,10);
+      if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; }
+      else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; }
+      else { return; }
+      saveLocal();                          // sauvegarde IMMÉDIATE à chaque frappe -> ne se perd plus
+    };
+    inp.addEventListener('input', save);
+    inp.addEventListener('change', ()=>{ save(); cloudMaybePush();
+      renderStyle();                        // le modèle de style apprend en direct (#4)
+      const kEl=document.getElementById('knownCount'); if(kEl) kEl.textContent=PLAYERS.filter(p=>m.preds[p]).length+'/'+PLAYERS.length;
+    });
+  });
   const wb=$('winBtn');
   if(wb) wb.onclick=()=>runWin(m,G);
 }
@@ -706,7 +709,12 @@ function runWin(m,G){
 }
 
 function afterEdit(){ saveLocal(); cloudMaybePush(); renderAll(); }
-function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList(); renderDetail(); renderStyle(); renderBonus(); }
+function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList();
+  // ne pas reconstruire le panneau détail si tu es en train d'y saisir (préserve champ + curseur)
+  const ae=document.activeElement; const detailEl=document.getElementById('detail');
+  const typing = ae && detailEl && detailEl.contains(ae) && /\bsc\b/.test(ae.className||'');
+  if(!typing) renderDetail();
+  renderStyle(); renderBonus(); }
 
 const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
 function teamSelect(k, val, ph){
