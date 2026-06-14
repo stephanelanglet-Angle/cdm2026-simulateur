@@ -245,32 +245,49 @@ function bestEV(G){
 
 /* ======================= STYLE DES ADVERSAIRES ======================= */
 // goalFactor = combien un joueur prédit de buts vs la moyenne du modèle sur les matchs déjà pronostiqués
+// v2 : style (volume) sur TOUS les matchs avec prono + calibration (précision/exacts)
+//      sur les matchs avec prono ET résultat. Shrinkage pour évoluer sainement.
+const STYLE_PRIOR = { goalK:4, calK:3, ppmPrior:1.2 };
 function playerStyle(){
+  const mi = MATCHES.map(m=>{ const G=grid(m.home,m.away); return {m,G}; });
   const st={};
-  // moyenne du total de buts attendu par le modèle sur les matchs joués (référence)
-  let modelTot=0,nM=0;
-  MATCHES.filter(m=>m.res).forEach(m=>{ const G=grid(m.home,m.away); modelTot+=(G.la+G.lb); nM++; });
-  const modelAvg = nM? modelTot/nM : P.muTotal;
+  // passe 1 : volume (tous matchs avec prono) + perf observée (prono + résultat)
   PLAYERS.forEach(pl=>{
-    let tot=0,n=0,draws=0,exact=0,scored=0;
-    MATCHES.filter(m=>m.res).forEach(m=>{
-      const pr=m.preds[pl]; if(!pr)return;
-      tot+=pr[0]+pr[1]; n++; if(pr[0]===pr[1])draws++;
-      const pt=pts(pr[0],pr[1],m.res[0],m.res[1]); scored+=pt; if(pt===4)exact++;
+    let tot=0,n=0,draws=0,modelTot=0, calN=0,exact=0,ppmSum=0;
+    mi.forEach(({m,G})=>{
+      const pr=m.preds[pl]; if(!pr) return;
+      tot+=pr[0]+pr[1]; n++; if(pr[0]===pr[1])draws++; modelTot+=(G.la+G.lb);
+      if(m.res){ calN++; const pt=pts(pr[0],pr[1],m.res[0],m.res[1]); ppmSum+=pt; if(pt===4)exact++; }
     });
-    st[pl]={ n, goalAvg:n?tot/n:modelAvg, goalFactor:n?(tot/n)/modelAvg:1, drawRate:n?draws/n:0, exact, scored };
+    const modelAvg = n? modelTot/n : P.muTotal;
+    const goalAvg  = n? tot/n : modelAvg;
+    const rawF     = modelAvg>0 ? goalAvg/modelAvg : 1;
+    const goalFactor = 1 + (rawF-1)*(n/(n+STYLE_PRIOR.goalK));          // shrink vers 1
+    st[pl]={ n, calN, goalAvg, goalFactor, drawRate:n?draws/n:0,
+             exact, exactRate:calN?exact/calN:null, ppm:calN?ppmSum/calN:null, ppmSum, active:n>0 };
   });
-  return {st, modelAvg};
+  // passe 2 : compétence = points/match observés, régularisés vers la moyenne du peloton,
+  //           mappés en un poids vers le jeu OPTIMAL dans la simulation.
+  const act = PLAYERS.filter(p=>st[p].active && st[p].calN>0);
+  const fieldPPM = act.length ? act.reduce((s,p)=>s+st[p].ppm,0)/act.length : STYLE_PRIOR.ppmPrior;
+  PLAYERS.forEach(pl=>{ const s=st[pl];
+    const ppmEff = (s.ppmSum + STYLE_PRIOR.calK*fieldPPM)/((s.calN||0)+STYLE_PRIOR.calK);
+    s.skill = clamp(0.30 + 0.28*ppmEff, 0.30, 0.95);   // 0.30 = naïf … 0.95 = ~optimal
+  });
+  return {st, fieldPPM};
 }
-// projection du prono d'un joueur sur un match à venir
+// projection du prono d'un joueur : mélange entre son style brut et le prono OPTIMAL,
+// pondéré par sa précision mesurée (un joueur calibré joue ~optimal). null si inactif.
 function projectPick(pl, G, style){
   const s=style.st[pl];
-  const f = s && s.n ? s.goalFactor : 1;
-  let a=G.la*f, b=G.lb*f;
-  // léger ajustement nul : si le joueur aime les nuls et le match est serré, rapprocher
-  let pa=Math.round(a), pb=Math.round(b);
-  if(s && s.drawRate>0.34 && Math.abs(G.la-G.lb)<0.35){ const m=Math.round((a+b)/2); pa=m; pb=m; }
-  return [Math.max(0,pa), Math.max(0,pb)];
+  if(!s || !s.active) return null;
+  const ev=bestEV(G).pred;
+  const f=s.goalFactor;
+  let styleA=G.la*f, styleB=G.lb*f;
+  if(s.drawRate>0.34 && Math.abs(G.la-G.lb)<0.35){ const m=(styleA+styleB)/2; styleA=m; styleB=m; }
+  const w=s.skill;                          // poids vers l'optimal (compétence mesurée)
+  return [ Math.max(0, Math.round(w*ev[0]+(1-w)*styleA)),
+           Math.max(0, Math.round(w*ev[1]+(1-w)*styleB)) ];
 }
 
 /* ======================= CLASSEMENT ======================= */
@@ -289,37 +306,48 @@ function standings(){
 let RNG = (function(){ let a=20260614>>>0; return function(){ a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296; }; })();
 function sampleScore(G){ const u=RNG(); let c=0; for(let i=0;i<=G.N;i++)for(let j=0;j<=G.N;j++){ c+=G.g[i][j]; if(u<=c) return [i,j]; } return G.modal; }
 
+// meilleur prono EV parmi les scores différents de `avoid` (pour se démarquer du leader)
+function bestEVdiff(G, avoid){
+  let best=null,be=-1;
+  for(let a=0;a<=6;a++)for(let b=0;b<=6;b++){ if(avoid&&a===avoid[0]&&b===avoid[1])continue;
+    const e=expPoints([a,b],G); if(e>be){be=e;best=[a,b];} }
+  return best||bestEV(G).pred;
+}
 function winSim(selMatch, candidates, nSims){
   const style=playerStyle();
   const base=standings(); const cur={}; base.forEach(r=>cur[r.p]=r.pts);
+  const leader = base[0].p;                 // rival principal à doubler
+  const iLead  = (leader===ME);             // suis-je en tête ?
   const remaining = MATCHES.filter(m=>!m.res);
-  // pré-calcul par match restant : grille, pick EV (utilisateur), pick projeté (adversaires)
+  // pré-calcul par match restant : grille ; prono futur du joueur (politique "pour gagner") ; pronos adversaires
   const info = remaining.map(m=>{
     const G=grid(m.home,m.away);
-    const meEV=bestEV(G).pred;
     const opp={}; PLAYERS.forEach(pl=>{ if(pl!==ME) opp[pl]=projectPick(pl,G,style); });
-    return {m,G,meEV,opp};
+    // politique du "moi futur" : en tête -> valeur sûre (EV) ; distancé -> me démarquer du leader
+    const lp = iLead ? null : projectPick(leader,G,style);
+    const meFut = iLead ? bestEV(G).pred : bestEVdiff(G, lp);
+    return {m,G,meFut,opp};
   });
   const others = PLAYERS.filter(p=>p!==ME);
-  const wins = candidates.map(()=>0);
+  const wins = candidates.map(()=>0), podium = candidates.map(()=>0);
   for(let s=0;s<nSims;s++){
-    // base : total de chacun sur tous les matchs restants ; pour MOI on exclut le match sélectionné
     const add={}; PLAYERS.forEach(p=>add[p]=0);
     let selResult=null;
     info.forEach(it=>{
       const r=sampleScore(it.G);
       if(it.m.id===selMatch.id){ selResult=r; }
       others.forEach(pl=>{ const pk=it.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
-      if(it.m.id!==selMatch.id){ add[ME]+=pts(it.meEV[0],it.meEV[1],r[0],r[1]); }
+      if(it.m.id!==selMatch.id){ add[ME]+=pts(it.meFut[0],it.meFut[1],r[0],r[1]); }
     });
-    const oMax = Math.max.apply(null, others.map(p=>cur[p]+add[p]));
+    const oTot = others.map(p=>cur[p]+add[p]).sort((a,b)=>b-a);
     const myBase = cur[ME]+add[ME];
     candidates.forEach((c,ci)=>{
       const mine = myBase + (selResult? pts(c[0],c[1],selResult[0],selResult[1]) : 0);
-      if(mine>=oMax) wins[ci]++;
+      if(mine>=oTot[0]) wins[ci]++;          // 1er (égalités comprises)
+      if(mine>=oTot[2]) podium[ci]++;        // top 3
     });
   }
-  return candidates.map((c,ci)=>({pred:c, winP:wins[ci]/nSims}));
+  return candidates.map((c,ci)=>({pred:c, winP:wins[ci]/nSims, podP:podium[ci]/nSims}));
 }
 
 /* ======================= UI ======================= */
@@ -389,10 +417,14 @@ function renderDetail(){
   } else {
     const ev=bestEV(G);
     h+=`<div class="kv" style="margin-top:10px"><span>Prono à <b>points espérés</b> max</span><span class="pill ev">${ev.pred[0]}-${ev.pred[1]} · ${ev.ev.toFixed(2)} pts</span></div>`;
-    // projections adversaires
-    h+=`<div class="note" style="margin-top:8px">Pronos probables des adversaires (projetés depuis leur style) :</div>`;
+    const known = PLAYERS.filter(p=>m.preds[p]).length;
+    h+=`<div class="note">Pronos déjà saisis pour ce match : <b id="knownCount">${known}/${PLAYERS.length}</b> — entre ceux des autres après le coup d'envoi pour affiner le modèle.</div>`;
+    // projections adversaires (skip inactifs ; menaces en rouge)
+    h+=`<div class="note" style="margin-top:8px">Pronos probables des adversaires (projetés selon style <b>+ précision</b>, ⚠️ rouge = menace) :</div>`;
     h+=`<div style="margin-top:5px">`+ PLAYERS.filter(p=>p!==ME).map(pl=>{
-      const pk=projectPick(pl,G,style); return `<span class="tag" style="margin:2px">${pl.split('_')[0]}: ${pk[0]}-${pk[1]}</span>`; }).join(' ')+`</div>`;
+      const pk=projectPick(pl,G,style); if(!pk) return '';
+      const thr = style.st[pl].skill>0.78;
+      return `<span class="tag" style="margin:2px;${thr?'border-color:var(--clay);color:var(--clay)':''}">${pl.split('_')[0]}: ${pk[0]}-${pk[1]}</span>`; }).filter(Boolean).join(' ')+`</div>`;
     // reco gagnante
     h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
        `<button class="btn primary" id="winBtn">Calculer</button></div>`+
@@ -418,8 +450,13 @@ function wireDetail(m,G){
     const pl=inp.dataset.pl;
     const ins=Array.from(document.querySelectorAll(`.pin`)).filter(x=>x.dataset.pl===pl);
     const a=parseInt(ins[0].value,10), b=parseInt(ins[1].value,10);
-    if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; saveLocal(); cloudMaybePush(); }
-    else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; saveLocal(); cloudMaybePush(); }
+    if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; }
+    else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; }
+    else { return; }
+    saveLocal(); cloudMaybePush();
+    renderStyle();                          // le modèle de style apprend en direct (#4)
+    const known=PLAYERS.filter(p=>m.preds[p]).length;
+    const kEl=document.getElementById('knownCount'); if(kEl) kEl.textContent=known+'/'+PLAYERS.length;
   }); });
   const wb=$('winBtn');
   if(wb) wb.onclick=()=>runWin(m,G);
@@ -434,18 +471,20 @@ function runWin(m,G){
     const push=k=>{ const s=k[0]+'-'+k[1]; if(!seen.has(s)){seen.add(s);cand.push(k);} };
     push(bestEV(G).pred);
     cells.slice(0,7).forEach(c=>push(c.k));
-    const res=winSim(m,cand,2500).sort((a,b)=>b.winP-a.winP);
+    const res=winSim(m,cand,4000).sort((a,b)=>(b.winP-a.winP)||(b.podP-a.podP)||(expPoints(b.pred,G)-expPoints(a.pred,G)));
     const best=res[0];
     let h=`<div class="big">${best.pred[0]} – ${best.pred[1]}</div>`+
-      `<div class="note">Meilleure probabilité de finir 1ᵉʳ du concours : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b></div>`;
-    h+=`<table style="margin-top:8px"><thead><tr><th>Ton prono</th><th>P(1ᵉʳ)</th><th>Pts espérés</th></tr></thead><tbody>`;
+      `<div class="note">Meilleure probabilité de finir 1ᵉʳ : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b> · podium ${(100*best.podP).toFixed(0)}%</div>`;
+    h+=`<table style="margin-top:8px"><thead><tr><th>Ton prono</th><th>P(1ᵉʳ)</th><th>P(podium)</th><th>Pts espérés</th></tr></thead><tbody>`;
     res.slice(0,6).forEach((r,i)=>{ h+=`<tr class="${i===0?'you':''}"><td class="mono">${r.pred[0]}-${r.pred[1]}</td>`+
-      `<td class="pts">${(100*r.winP).toFixed(1)}%</td><td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
+      `<td class="pts">${(100*r.winP).toFixed(1)}%</td><td class="mono">${(100*r.podP).toFixed(0)}%</td>`+
+      `<td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
     h+=`</tbody></table>`;
     const evp=bestEV(G).pred;
     if(evp[0]!==best.pred[0]||evp[1]!==best.pred[1])
       h+=`<div class="note warn">⚠️ La reco gagnante (${best.pred[0]}-${best.pred[1]}) diffère du prono à points-max (${evp[0]}-${evp[1]}) : être distancé pousse à prendre de la variance pour pouvoir doubler le leader.</div>`;
     else h+=`<div class="note">Ici, jouer la valeur sûre maximise aussi tes chances de titre.</div>`;
+    h+=`<div class="note">Adversaires simulés selon leur <b>précision mesurée</b> (un joueur calibré joue ~optimal → plus dur à doubler). Plus tu saisis de pronos réels, plus c'est fiable. Relance à chaque journée.</div>`;
     $('recoOut').innerHTML=h;
   },30);
 }
@@ -455,11 +494,23 @@ function renderAll(){ renderStandings(); renderMatchList(); renderDetail(); rend
 
 function renderStyle(){
   const {st}=playerStyle();
-  let h='<thead><tr><th class="l">Joueur</th><th>Buts/match prédits</th><th>Style</th><th>Nuls prédits</th><th>Exacts (8)</th></tr></thead><tbody>';
-  PLAYERS.forEach(pl=>{ const s=st[pl]; if(!s.n){ h+=`<tr><td class="l">${pl}</td><td colspan="4" style="color:var(--faint)">inactif</td></tr>`; return; }
-    const lab = s.goalFactor>1.25?'agressif':(s.goalFactor<0.8?'prudent':'équilibré');
-    h+=`<tr class="${pl===ME?'you':''}"><td class="l">${pl}</td><td class="mono">${s.goalAvg.toFixed(2)}</td>`+
-       `<td>${lab} <span class="tag">×${s.goalFactor.toFixed(2)}</span></td><td class="mono">${(100*s.drawRate).toFixed(0)}%</td><td class="mono">${s.exact}</td></tr>`; });
+  let h='<thead><tr><th class="l">Joueur</th><th>Buts/match</th><th>Style</th><th>Exacts</th><th>Pts/match</th><th>Niveau</th><th>Menace</th></tr></thead><tbody>';
+  // tri par compétence pour faire ressortir les menaces
+  const ordered=PLAYERS.slice().sort((a,b)=>((st[b].active?1:0)-(st[a].active?1:0))||((st[b].skill||0)-(st[a].skill||0)));
+  ordered.forEach(pl=>{ const s=st[pl];
+    if(!s.active){ h+=`<tr><td class="l">${pl}</td><td colspan="6" style="color:var(--faint)">inactif (aucun prono)</td></tr>`; return; }
+    const lab = s.goalFactor>1.25?'agressif':(s.goalFactor<0.82?'prudent':'équilibré');
+    const exr = s.exactRate!=null? (100*s.exactRate).toFixed(0)+'%' : '—';
+    const ppm = s.ppm!=null? s.ppm.toFixed(2) : '—';
+    const threat = s.skill>0.78 ? '⚠️ forte' : (s.skill>0.66?'moyenne':'faible');
+    const tcol = s.skill>0.78 ? 'var(--clay)' : (s.skill>0.66?'var(--gold)':'var(--faint)');
+    h+=`<tr class="${pl===ME?'you':''}"><td class="l">${pl}${pl===ME?' ⭐':''}</td>`+
+       `<td class="mono">${s.goalAvg.toFixed(2)}</td>`+
+       `<td>${lab} <span class="tag">×${s.goalFactor.toFixed(2)}</span></td>`+
+       `<td class="mono">${exr}</td>`+
+       `<td class="mono">${ppm}</td>`+
+       `<td class="mono">${(100*s.skill).toFixed(0)}%</td>`+
+       `<td style="color:${tcol};font-weight:600">${threat}</td></tr>`; });
   h+='</tbody>'; $('styleTbl').innerHTML=h;
 }
 
