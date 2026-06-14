@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git --version)",
+      "Bash(gh --version)",
+      "Bash(gh auth *)",
+      "PowerShell(git --version; \"---\"; \\(Get-Command gh -ErrorAction SilentlyContinue\\).Source; \"---gitconfig---\"; git config --global user.name; git config --global user.email)",
+      "PowerShell(\"--- SSH keys ---\"; if \\(Test-Path \"$env:USERPROFILE\\\\.ssh\"\\) { Get-ChildItem \"$env:USERPROFILE\\\\.ssh\" -Name } else { \"no .ssh dir\" }; \"--- git credential helper ---\"; git config --global credential.helper; \"--- GH env token? ---\"; if \\($env:GH_TOKEN -or $env:GITHUB_TOKEN\\) { \"token env present\" } else { \"no token env\" })",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git ls-remote *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Ajout du simulateur Monte Carlo CdM 2026 \\(Elo + Poisson\\) + README, requirements, .gitignore *)",
+      "Bash(git merge *)"
+    ]
+  }
+}
