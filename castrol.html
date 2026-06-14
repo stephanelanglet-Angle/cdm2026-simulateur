@@ -682,16 +682,19 @@ function renderStyle(){
 }
 
 /* ======================= PERSISTENCE + SYNC ======================= */
-const LS='castrol_legends_state';
+const LS='castrol_legends_state_v2';   // clé versionnée : ignore les sauvegardes de l'ancien schéma
+const SCHEMA=2;
 // NB : on NE persiste PAS les paramètres du modèle ici (source unique = simulateur principal)
-function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL }; }
+function serialize(){ return { v:SCHEMA, matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL }; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
+// renvoie true si appliqué, false si schéma incompatible (ancienne version) -> évite la corruption
 function applyState(s){
-  if(!s) return;
+  if(!s || s.v!==SCHEMA) return false;
   if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ m.res=sm.res||null; if(sm.preds)m.preds=sm.preds; } }); }
   if(s.bonus){ BONUS_ACTUAL = { semis: Array.isArray(s.bonus.semis)? s.bonus.semis.slice(0,4) : [null,null,null,null],
     champ: s.bonus.champ||null, tor: s.bonus.tor||null };
     while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
+  return true;
 }
 function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
 
@@ -715,11 +718,12 @@ function connect(c){
   if(!db){ try{firebase.initializeApp(FB);}catch(e){} db=firebase.database(); }
   if(ref) ref.off();
   ref=db.ref('rooms/'+c); connected=true; gotInit=false; setSync('☁️ '+c+' · connexion…');
-  ref.on('value',snap=>{ const v=snap.val();
-    if(!v||!v.data){ const s=serialize(); lastSig=sig(s); if(ref)ref.set({data:s,at:new Date().toISOString()}); gotInit=true; setSync('☁️ '+c+' · prêt'); return; }
-    const sg=sig(v.data); gotInit=true;
+  ref.on('value',snap=>{ const v=snap.val(); const d=v&&v.data;
+    if(!d){ const s=serialize(); lastSig=sig(s); if(ref)ref.set({data:s,at:new Date().toISOString()}); gotInit=true; setSync('☁️ '+c+' · prêt'); return; }
+    if(d.v!==SCHEMA){ gotInit=true; setSync('☁️ '+c+' · anciennes données ignorées (ferme les vieux onglets)'); return; }  // n'applique/rend PAS
+    const sg=sig(d); gotInit=true;
     if(sg===lastSig){ setSync('☁️ '+c+' · à jour'); return; }
-    lastSig=sg; applyState(v.data); renderAll(); setSync('☁️ '+c+' · reçu '+new Date().toLocaleTimeString());
+    lastSig=sg; if(applyState(d)) renderAll(); setSync('☁️ '+c+' · reçu '+new Date().toLocaleTimeString());
   }, ()=>{ connected=false; setSync('☁️ accès refusé (règles ?)'); });
 }
 setInterval(cloudMaybePush, 900);
