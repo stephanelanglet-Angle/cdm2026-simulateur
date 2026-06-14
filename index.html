@@ -4,22 +4,40 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>CDM 2026 · Régie probabiliste</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0C1A16;--panel:#122620;--panel2:#16302A;--line:#24433A;--line2:#2F564A;--chalk:#ECF5EF;--muted:#8FAEA2;--faint:#5E7A70;--grass:#58C281;--gold:#E9C46A;--clay:#E07A6B;--display:'Saira Condensed','Arial Narrow',Arial,sans-serif;--body:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,sans-serif;--mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;}
+:root{
+  --bg:#0C1A16; --panel:#122620; --panel2:#16302A; --line:#24433A; --line2:#2F564A;
+  --chalk:#ECF5EF; --muted:#8FAEA2; --faint:#5E7A70;
+  --grass:#58C281; --gold:#E9C46A; --clay:#E07A6B;
+  --display:'Saira Condensed','Arial Narrow',Arial,sans-serif;
+  --body:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-body{background:var(--bg);color:var(--chalk);font-family:var(--body);font-size:15px;line-height:1.45;background-image:radial-gradient(circle at 50% -140px, rgba(88,194,129,.10), transparent 380px),linear-gradient(rgba(236,245,239,.022) 1px, transparent 1px);background-size:auto, 100% 56px;}
+body{background:var(--bg);color:var(--chalk);font-family:var(--body);font-size:15px;line-height:1.45;
+  background-image:
+    radial-gradient(circle at 50% -140px, rgba(88,194,129,.10), transparent 380px),
+    linear-gradient(rgba(236,245,239,.022) 1px, transparent 1px);
+  background-size:auto, 100% 56px;}
 button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-appearance:none}
 .wrap{max-width:1100px;margin:0 auto;padding:0 14px 60px}
+
 header{position:relative;padding:26px 0 14px;overflow:hidden}
-header .pitch{position:absolute;inset:0;pointer-events:none;opacity:.5;background:radial-gradient(circle at 50% 50%, transparent 56px, rgba(236,245,239,.05) 57px, rgba(236,245,239,.05) 58px, transparent 59px),linear-gradient(rgba(236,245,239,.05),rgba(236,245,239,.05)) 50% 0/2px 100% no-repeat;}
+header .pitch{position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 56px, rgba(236,245,239,.05) 57px, rgba(236,245,239,.05) 58px, transparent 59px),
+    linear-gradient(rgba(236,245,239,.05),rgba(236,245,239,.05)) 50% 0/2px 100% no-repeat;}
 header h1{font-family:var(--display);font-weight:800;font-size:clamp(34px,6vw,52px);letter-spacing:.5px;line-height:.95;text-transform:uppercase}
 header h1 .y{color:var(--gold)}
 header .sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:640px}
 .headrow{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;position:relative}
 .gear{border:1px solid var(--line2);border-radius:9px;padding:8px 13px;font-size:13px;color:var(--chalk);background:var(--panel);white-space:nowrap}
 .gear:hover{border-color:var(--grass)}
+
 #paramsBar{display:none;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
 #paramsBar.open{display:block}
 .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px 22px}
@@ -28,14 +46,823 @@ header .sub{color:var(--muted);font-size:13.5px;margin-top:6px;max-width:640px}
 input[type=range]{width:100%;accent-color:var(--grass);height:22px}
 select{background:var(--panel2);color:var(--chalk);border:1px solid var(--line2);border-radius:8px;padding:7px 9px;font-size:13px;width:100%}
 .params-note{color:var(--faint);font-size:12px;margin-top:10px}
+
 .ioBar{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
 .ioBtn{border:1px solid var(--line2);border-radius:8px;padding:8px 14px;font-size:12.5px;color:var(--muted);background:var(--panel2)}
 .ioBtn:hover{border-color:var(--grass);color:var(--chalk)}
 .ioBtn:active{transform:scale(.98)}
 #importFile{display:none}
-#statusBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 14px;margin:12px 0 18px;font-size:13px}
+
+#statusBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--line);background:var(--panel);
+  border-radius:12px;padding:10px 14px;margin:12px 0 18px;font-size:13px}
 #statusTxt{color:var(--muted)} #statusTxt b{color:var(--chalk);font-family:var(--mono);font-weight:600}
-#consTxt{color:var(--gold)}
+#consTxt{color:var(--gold)} 
 #clearCons{border:1px solid var(--line2);border-radius:7px;padding:4px 10px;font-size:12px;color:var(--muted)}
 #clearCons:hover{color:var(--clay);border-color:var(--clay)}
-.prog{flex:1 1
+.prog{flex:1 1 140px;min-width:120px;height:5px;border-radius:3px;background:var(--panel2);overflow:hidden}
+.prog>i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--grass),var(--gold));transition:width .12s linear}
+
+main{display:grid;grid-template-columns:1fr;gap:18px}
+@media(min-width:920px){main{grid-template-columns:1fr 1.08fr;align-items:start}}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:16px}
+.card h2{font-family:var(--display);font-weight:700;font-size:19px;text-transform:uppercase;letter-spacing:.8px;color:var(--chalk);margin-bottom:12px}
+.card h2 small{color:var(--faint);font-family:var(--body);text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;margin-left:8px}
+
+.groups{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-bottom:14px}
+.gchip{border:1px solid var(--line2);border-radius:10px;padding:7px 2px 5px;text-align:center;background:var(--panel2);transition:border-color .12s}
+.gchip .gl{font-family:var(--display);font-weight:800;font-size:19px;line-height:1}
+.gchip .gf{font-size:13px;line-height:1.25;display:block;filter:saturate(.85)}
+.gchip[aria-pressed=true]{border-color:var(--gold);background:#1C3A30}
+.gchip:hover{border-color:var(--grass)}
+
+.dayLbl{color:var(--faint);font-size:11.5px;text-transform:uppercase;letter-spacing:1.2px;margin:13px 2px 6px;font-family:var(--mono)}
+.ticket{width:100%;text-align:left;border:1px solid var(--line2);border-radius:11px;background:var(--panel2);padding:10px 12px 11px;margin-bottom:8px;transition:border-color .12s;position:relative}
+.ticket:hover{border-color:var(--grass)}
+.ticket.sel{border-color:var(--gold);background:#1C3A30}
+.ticket .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ticket .tn{font-family:var(--display);font-weight:700;font-size:16.5px;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ticket .tn .fl{font-size:15px;margin:0 4px}
+.ticket .pct{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap}
+.ticket .pct b{font-weight:600}
+.pA{color:var(--grass)} .pN{color:var(--gold)} .pB{color:var(--clay)}
+.tribar{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:7px;background:var(--panel)}
+.tribar>span:nth-child(1){background:var(--grass)} .tribar>span:nth-child(2){background:var(--gold)} .tribar>span:nth-child(3){background:var(--clay)}
+.lock{position:absolute;top:-7px;right:10px;background:var(--gold);color:#1B2A22;font-size:10.5px;font-weight:600;border-radius:6px;padding:1px 7px;font-family:var(--mono)}
+.badge{display:inline-block;border:1px solid var(--line2);color:var(--gold);border-radius:6px;font-size:10.5px;padding:0 6px;margin-left:7px;font-family:var(--mono);vertical-align:2px}
+
+#detail .ctx{color:var(--faint);font-size:12px;font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:14px}
+.vs .side{min-width:0}
+.vs .side.r{text-align:right}
+.vs .nm{font-family:var(--display);font-weight:800;font-size:clamp(21px,4.6vw,29px);line-height:1;text-transform:uppercase;letter-spacing:.4px}
+.vs .nm .fl{font-size:.85em}
+.vs .elo{color:var(--faint);font-family:var(--mono);font-size:11.5px;margin-top:3px}
+.vs .x{color:var(--faint);font-family:var(--display);font-weight:600;font-size:15px}
+.big3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:10px}
+.big3 .b{border:1px solid var(--line2);border-radius:11px;padding:10px 4px 8px;background:var(--panel2)}
+.big3 .v{font-family:var(--mono);font-weight:600;font-size:clamp(19px,4vw,24px)}
+.big3 .l{color:var(--muted);font-size:11px;margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
+.bigbar{height:8px;border-radius:4px;margin:2px 0 14px}
+.facts{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:12.5px;margin-bottom:14px;flex-wrap:wrap}
+.facts b{color:var(--chalk);font-family:var(--mono);font-weight:600}
+
+.hmwrap{margin-bottom:14px}
+.hmcap{display:flex;justify-content:space-between;color:var(--faint);font-size:11.5px;margin-bottom:6px}
+.hm{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
+.hm .c{aspect-ratio:1.45/1;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:10.5px;color:var(--chalk);background:var(--panel2)}
+.hm .lab{background:none;color:var(--faint);font-size:10.5px}
+.hm .mode{outline:1.5px solid var(--gold);outline-offset:-1.5px}
+
+.forceRow{border-top:1px dashed var(--line2);padding-top:13px}
+.forceRow .ft{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.chips{display:flex;gap:7px;flex-wrap:wrap}
+.chip{border:1px solid var(--line2);border-radius:9px;padding:7px 12px;font-size:12.5px;background:var(--panel2);font-family:var(--mono)}
+.chip:hover{border-color:var(--grass)}
+.chip.on{border-color:var(--gold);background:#2A4435;color:var(--gold)}
+.chip.free.on{border-color:var(--line2);background:var(--panel2);color:var(--muted)}
+.forceNote{color:var(--faint);font-size:11.5px;margin-top:9px}
+
+#tourney{margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-family:var(--mono);font-weight:600;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+th:first-child{text-align:left}
+td{padding:6.5px 8px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+td.team{text-align:left;font-family:var(--body);font-size:13.5px;font-weight:500;white-space:nowrap;max-width:172px;overflow:hidden;text-overflow:ellipsis}
+td.team .fl{margin-right:6px}
+td.team .gp{color:var(--faint);font-family:var(--mono);font-size:10.5px;margin-left:5px}
+.tbar{display:inline-block;vertical-align:middle;height:7px;border-radius:3px;background:linear-gradient(90deg,var(--gold),#C9912F);margin-right:7px;min-width:1px}
+.dpos{color:var(--grass)} .dneg{color:var(--clay)} .dzero{color:var(--faint)}
+#moreBtn{margin-top:11px;border:1px solid var(--line2);border-radius:8px;padding:7px 13px;font-size:12.5px;color:var(--muted)}
+#moreBtn:hover{border-color:var(--grass);color:var(--chalk)}
+.tnote{color:var(--faint);font-size:11.5px;margin-top:10px}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--panel);border:1px solid var(--gold);border-radius:10px;padding:12px 20px;font-size:13px;color:var(--chalk);opacity:0;transition:opacity .25s,transform .25s;z-index:1000}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+footer{margin-top:26px;color:var(--faint);font-size:11.5px;line-height:1.6;border-top:1px solid var(--line);padding-top:14px}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+@media(max-width:480px){
+  .groups{grid-template-columns:repeat(6,1fr)}
+  .ticket .pct{font-size:10.5px}
+  td,th{padding:6px 5px}
+  td.team{max-width:118px}
+  .ioBar{flex-direction:column}
+  .ioBtn{width:100%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="pitch"></div>
+  <div class="headrow">
+    <div>
+      <h1>CDM <span class="y">2026</span> · Régie probabiliste</h1>
+      <div class="sub">Probabilités exactes par match (modèle Elo → Poisson) et conséquences sur le tournoi.</div>
+    </div>
+    <button class="gear" id="gearBtn" aria-expanded="false">⚙ Paramètres</button>
+  </div>
+</header>
+
+<section id="paramsBar" aria-label="Paramètres">
+  <div class="params">
+    <div class="param">
+      <label>Bonus hôte (MEX·USA·CAN) <b id="vHost">+60 Elo</b></label>
+      <input type="range" id="pHost" min="0" max="120" step="10" value="60">
+    </div>
+    <div class="param">
+      <label>Elo par but de supériorité <b id="vDiv">300</b></label>
+      <input type="range" id="pDiv" min="200" max="400" step="10" value="300">
+    </div>
+    <div class="param">
+      <label>Buts attendus par match <b id="vMu">2,70</b></label>
+      <input type="range" id="pMu" min="2.2" max="3.2" step="0.05" value="2.7">
+    </div>
+    <div class="param">
+      <label>Tournois simulés</label>
+      <select id="pSims">
+        <option value="3000">3 000 · rapide</option>
+        <option value="10000" selected>10 000 · équilibré</option>
+        <option value="20000">20 000 · précis</option>
+        <option value="50000">50 000 · référence</option>
+      </select>
+    </div>
+  </div>
+  <div class="params-note">Un diviseur plus bas accentue les favoris ; plus haut, il augmente le taux de surprises.</div>
+  <div class="ioBar">
+    <button class="ioBtn" id="exportBtn">📤 Exporter l'état</button>
+    <button class="ioBtn" id="importBtn">📥 Importer l'état</button>
+    <input type="file" id="importFile" accept=".json">
+  </div>
+</section>
+
+<div id="statusBar">
+  <span id="statusTxt">Initialisation…</span>
+  <div class="prog"><i id="progBar"></i></div>
+  <span id="consTxt" hidden></span>
+  <button id="clearCons" hidden>✕ Tout libérer</button>
+</div>
+
+<main>
+  <section class="card" aria-label="Matchs de la phase de groupes">
+    <h2>Phase de groupes <small>72 matchs · 11–27 juin</small></h2>
+    <div class="groups" id="groupSel" role="group" aria-label="Choisir un groupe"></div>
+    <div id="matchList"></div>
+  </section>
+  <section class="card" id="detail" aria-label="Détail du match sélectionné"></section>
+</main>
+
+<section class="card" id="tourney" aria-label="Probabilités du tournoi">
+  <h2>Conséquences sur le tournoi <small id="tourneyCtx"></small></h2>
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr>
+      <th>Équipe</th><th>Titre</th><th id="thDelta" hidden>Δ titre</th><th>Finale</th><th>Demie</th><th>Qualif.</th>
+    </tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  </div>
+  <button id="moreBtn">Afficher les 48 équipes</button>
+  <div class="tnote" id="tnote"></div>
+</section>
+
+<footer id="foot"></footer>
+<div id="toast"></div>
+</div>
+
+<script>
+'use strict';
+
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function poisson(lambda, rnd){
+  const L = Math.exp(-lambda);
+  let k = 0, p = 1;
+  do { k++; p *= rnd(); } while (p > L);
+  return k - 1;
+}
+function clamp(x, lo, hi){ return x < lo ? lo : (x > hi ? hi : x); }
+
+const GROUPS_DATA = {
+  A: [ ['Mexique',1800,'\u{1F1F2}\u{1F1FD}',true], ['Afrique du Sud',1640,'\u{1F1FF}\u{1F1E6}',false], ['Cor\u00e9e du Sud',1760,'\u{1F1F0}\u{1F1F7}',false], ['Tch\u00e9quie',1780,'\u{1F1E8}\u{1F1FF}',false] ],
+  B: [ ['Canada',1750,'\u{1F1E8}\u{1F1E6}',true], ['Bosnie',1690,'\u{1F1E7}\u{1F1E6}',false], ['Qatar',1675,'\u{1F1F6}\u{1F1E6}',false], ['Suisse',1897,'\u{1F1E8}\u{1F1ED}',false] ],
+  C: [ ['Br\u00e9sil',1988,'\u{1F1E7}\u{1F1F7}',false], ['Maroc',1845,'\u{1F1F2}\u{1F1E6}',false], ['Ha\u00efti',1560,'\u{1F1ED}\u{1F1F9}',false], ['\u00c9cosse',1770,'\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E007F}',false] ],
+  D: [ ['\u00c9tats-Unis',1790,'\u{1F1FA}\u{1F1F8}',true], ['Paraguay',1730,'\u{1F1F5}\u{1F1FE}',false], ['Australie',1715,'\u{1F1E6}\u{1F1FA}',false], ['Turquie',1880,'\u{1F1F9}\u{1F1F7}',false] ],
+  E: [ ['Allemagne',1925,'\u{1F1E9}\u{1F1EA}',false], ['Cura\u00e7ao',1565,'\u{1F1E8}\u{1F1FC}',false], ['C\u00f4te d\u2019Ivoire',1745,'\u{1F1E8}\u{1F1EE}',false], ['\u00c9quateur',1935,'\u{1F1EA}\u{1F1E8}',false] ],
+  F: [ ['Pays-Bas',1944,'\u{1F1F3}\u{1F1F1}',false], ['Japon',1879,'\u{1F1EF}\u{1F1F5}',false], ['Su\u00e8de',1790,'\u{1F1F8}\u{1F1EA}',false], ['Tunisie',1685,'\u{1F1F9}\u{1F1E3}',false] ],
+  G: [ ['Belgique',1849,'\u{1F1E7}\u{1F1EA}',false], ['\u00c9gypte',1660,'\u{1F1EA}\u{1F1EC}',false], ['Iran',1800,'\u{1F1EE}\u{1F1F7}',false], ['Nouvelle-Z\u00e9lande',1505,'\u{1F1F3}\u{1F1FF}',false] ],
+  H: [ ['Espagne',2155,'\u{1F1EA}\u{1F1F8}',false], ['Cap-Vert',1615,'\u{1F1E8}\u{1F1FB}',false], ['Arabie saoudite',1635,'\u{1F1F8}\u{1F1E6}',false], ['Uruguay',1890,'\u{1F1FA}\u{1F1FE}',false] ],
+  I: [ ['France',2062,'\u{1F1EB}\u{1F1F7}',false], ['S\u00e9n\u00e9gal',1869,'\u{1F1F8}\u{1F1F3}',false], ['Irak',1600,'\u{1F1EE}\u{1F1F6}',false], ['Norv\u00e8ge',1917,'\u{1F1F3}\u{1F1F4}',false] ],
+  J: [ ['Argentine',2113,'\u{1F1E6}\u{1F1F7}',false], ['Alg\u00e9rie',1760,'\u{1F1E9}\u{1F1FF}',false], ['Autriche',1785,'\u{1F1E6}\u{1F1F9}',false], ['Jordanie',1605,'\u{1F1EF}\u{1F1F4}',false] ],
+  K: [ ['Portugal',1984,'\u{1F1F5}\u{1F1F9}',false], ['RD Congo',1680,'\u{1F1E8}\u{1F1E9}',false], ['Ouzb\u00e9kistan',1680,'\u{1F1FA}\u{1F1FF}',false], ['Colombie',1977,'\u{1F1E8}\u{1F1F4}',false] ],
+  L: [ ['Angleterre',2020,'\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}',false], ['Croatie',1908,'\u{1F1ED}\u{1F1F7}',false], ['Ghana',1635,'\u{1F1EC}\u{1F1ED}',false], ['Panama',1650,'\u{1F1F5}\u{1F1E6}',false] ],
+};
+const GROUP_LETTERS = Object.keys(GROUPS_DATA);
+
+const TEAMS = [];
+const GIDX = {};
+GROUP_LETTERS.forEach(L => {
+  GIDX[L] = GROUPS_DATA[L].map(([name, elo, flag, host]) => {
+    const id = TEAMS.length;
+    TEAMS.push({ id, name, elo, flag, group: L, host });
+    return id;
+  });
+});
+const NT = TEAMS.length;
+
+function effElo(t, hostBonus){ return t.elo + (t.host ? hostBonus : 0); }
+const PAIRS = [ [0,1],[2,3], [0,2],[3,1], [3,0],[1,2] ];
+const PAIR_DAY = [1,1,2,2,3,3];
+
+function matchLambdas(eloA, eloB, p){
+  const sup = (eloA - eloB) / p.divGoals;
+  return [ clamp((p.muTotal + sup)/2, 0.12, 6.0), clamp((p.muTotal - sup)/2, 0.12, 6.0) ];
+}
+
+function poissonPmfVec(lambda, n){
+  const v = new Float64Array(n+1);
+  v[0] = Math.exp(-lambda);
+  for(let k=1;k<=n;k++) v[k] = v[k-1]*lambda/k;
+  return v;
+}
+
+function matchProbs(eloA, eloB, p){
+  const [la, lb] = matchLambdas(eloA, eloB, p);
+  const N = 14;
+  const pa = poissonPmfVec(la, N), pb = poissonPmfVec(lb, N);
+  let pA=0, pN=0, pB=0, best=[0,0], bestP=-1;
+  const grid = [];
+  for(let i=0;i<=N;i++){ grid.push(new Float64Array(N+1)); }
+  for(let i=0;i<=N;i++) for(let j=0;j<=N;j++){
+    const q = pa[i]*pb[j];
+    grid[i][j] = q;
+    if(i>j) pA+=q; else if(i===j) pN+=q; else pB+=q;
+    if(q>bestP){ bestP=q; best=[i,j]; }
+  }
+  return { la, lb, pA, pN, pB, best, bestP, grid, N };
+}
+
+function buildConstrainedSampler(eloA, eloB, p, outcome){
+  const m = matchProbs(eloA, eloB, p);
+  const cells = [];
+  let tot = 0;
+  for(let i=0;i<=m.N;i++) for(let j=0;j<=m.N;j++){
+    const keep = (outcome==='A' && i>j) || (outcome==='D' && i===j) || (outcome==='B' && i<j);
+    if(keep){ tot += m.grid[i][j]; cells.push([i,j,tot]); }
+  }
+  if(tot<=0){
+    const fb = outcome==='A' ? [1,0] : (outcome==='B' ? [0,1] : [0,0]);
+    return () => fb;
+  }
+  return function(rnd){
+    const u = rnd()*tot;
+    let lo=0, hi=cells.length-1;
+    while(lo<hi){ const mid=(lo+hi)>>1; if(cells[mid][2] < u) lo=mid+1; else hi=mid; }
+    return [cells[lo][0], cells[lo][1]];
+  };
+}
+
+function simKO(a, b, elo, p, rnd){
+  const ea = elo[a], eb = elo[b];
+  const [la, lb] = matchLambdas(ea, eb, p);
+  let ga = poisson(la, rnd), gb = poisson(lb, rnd);
+  if(ga === gb){
+    const sup = (ea-eb)/p.divGoals;
+    ga += poisson(clamp(0.275 + sup/6, 0.05, 3.0), rnd);
+    gb += poisson(clamp(0.275 - sup/6, 0.05, 3.0), rnd);
+  }
+  if(ga === gb){
+    const We = 1/(1+Math.pow(10, -(ea-eb)/400));
+    const pA = clamp(0.5 + 0.20*(We-0.5), 0.42, 0.58);
+    if(rnd() < pA) ga++; else gb++;
+  }
+  return ga > gb ? a : b;
+}
+
+const SLOT_ELIG = [
+  new Set([0,1,2,3,5]), new Set([2,3,5,6,7]), new Set([2,4,5,7,8]), new Set([4,7,8,9,10]),
+  new Set([1,4,5,8,9]), new Set([0,4,7,8,9]), new Set([4,5,6,8,9]), new Set([3,4,8,9,11]),
+];
+function matchSlots(qualGroups){
+  const assignment = new Array(8).fill(-1);
+  const gpos = new Array(8).fill(-1);
+  function tryAssign(slot, seen){
+    for(let k=0;k<8;k++){
+      const g = qualGroups[k];
+      if(SLOT_ELIG[slot].has(g) && !seen[k]){
+        seen[k] = true;
+        if(gpos[k] === -1 || tryAssign(gpos[k], seen)){
+          gpos[k] = slot; assignment[slot] = g; return true;
+        }
+      }
+    }
+    return false;
+  }
+  let ok = true;
+  for(let s=0;s<8;s++){ if(!tryAssign(s, new Array(8).fill(false))) ok = false; }
+  if(!ok){
+    const used = new Set(); assignment.fill(-1);
+    for(let s=0;s<8;s++){
+      for(const g of qualGroups){ if(SLOT_ELIG[s].has(g) && !used.has(g)){ assignment[s]=g; used.add(g); break; } }
+    }
+  }
+  return assignment;
+}
+
+function createSimulation(params, constraints, seed){
+  const rndG = Array.from({length:12}, (_,gi) => mulberry32((seed ^ Math.imul(gi+1, 0x9E3779B9)) >>> 0));
+  const rndKO = mulberry32((seed ^ 0x5DEECE6D) >>> 0);
+  const elo = TEAMS.map(t => effElo(t, params.hostBonus));
+  const groupPlans = GROUP_LETTERS.map((L, gi) => {
+    const ids = GIDX[L];
+    return PAIRS.map(([x,y], pi) => {
+      const key = L + '-' + x + '-' + y;
+      const c = constraints ? constraints.get(key) : undefined;
+      if(c){
+        const sampler = buildConstrainedSampler(elo[ids[x]], elo[ids[y]], params, c);
+        return { x, y, constrained: true, sampler };
+      }
+      const [la, lb] = matchLambdas(elo[ids[x]], elo[ids[y]], params);
+      return { x, y, constrained: false, la, lb };
+    });
+  });
+  const cChamp = new Float64Array(NT), cFinal = new Float64Array(NT),
+        cSF = new Float64Array(NT), cQF = new Float64Array(NT),
+        cR16 = new Float64Array(NT), cR32 = new Float64Array(NT),
+        cWinG = new Float64Array(NT);
+  let done = 0;
+  function runChunk(n){
+    const pts = new Float64Array(4), gf = new Float64Array(4), ga = new Float64Array(4);
+    const winners = new Int16Array(12), runners = new Int16Array(12), thirds = new Int16Array(12);
+    const thirdKey = new Float64Array(12);
+    const order = [0,1,2,3];
+    for(let s=0; s<n; s++){
+      for(let gi=0; gi<12; gi++){
+        const ids = GIDX[GROUP_LETTERS[gi]];
+        const rnd = rndG[gi];
+        pts.fill(0); gf.fill(0); ga.fill(0);
+        const plan = groupPlans[gi];
+        for(let pi=0; pi<6; pi++){
+          const pl = plan[pi];
+          let gx, gy;
+          if(pl.constrained){ const r = pl.sampler(rnd); gx = r[0]; gy = r[1]; }
+          else { gx = poisson(pl.la, rnd); gy = poisson(pl.lb, rnd); }
+          gf[pl.x]+=gx; ga[pl.x]+=gy; gf[pl.y]+=gy; ga[pl.y]+=gx;
+          if(gx>gy) pts[pl.x]+=3; else if(gx<gy) pts[pl.y]+=3; else { pts[pl.x]++; pts[pl.y]++; }
+        }
+        order[0]=0; order[1]=1; order[2]=2; order[3]=3;
+        const key = [0,0,0,0];
+        for(let k=0;k<4;k++) key[k] = pts[k]*1e9 + (gf[k]-ga[k]+100)*1e5 + gf[k]*1e2 + rnd();
+        order.sort((u,v) => key[v]-key[u]);
+        winners[gi] = ids[order[0]];
+        runners[gi] = ids[order[1]];
+        thirds[gi]  = ids[order[2]];
+        const r3 = order[2];
+        thirdKey[gi] = pts[r3]*1e9 + (gf[r3]-ga[r3]+100)*1e5 + gf[r3]*1e2 + rnd();
+      }
+      const gOrder = [0,1,2,3,4,5,6,7,8,9,10,11].sort((u,v)=>thirdKey[v]-thirdKey[u]);
+      const qual = gOrder.slice(0,8).sort((u,v)=>u-v);
+      const assign = matchSlots(qual);
+      const T = assign.map(g => thirds[g]);
+      const W = g => winners[g], R = g => runners[g];
+      const A=0,B=1,C=2,D=3,E=4,F=5,G=6,H=7,I=8,J=9,K=10,Lx=11;
+      const r32a = [R(A), W(E), W(F), W(C), W(I), R(E), W(A), W(Lx), W(D), W(G), R(K), W(H), W(B), W(J), W(K), R(D)];
+      const r32b = [R(B), T[0], R(C), R(F), T[1], R(I), T[2], T[3], T[4], T[5], R(Lx), R(J), T[6], R(H), T[7], R(G)];
+      const w32 = new Int16Array(16);
+      for(let m=0;m<16;m++) w32[m] = simKO(r32a[m], r32b[m], elo, params, rndKO);
+      const R16P = [[1,4],[0,2],[3,5],[6,7],[10,11],[8,9],[13,15],[12,14]];
+      const w16 = new Int16Array(8);
+      for(let m=0;m<8;m++) w16[m] = simKO(w32[R16P[m][0]], w32[R16P[m][1]], elo, params, rndKO);
+      const QFP = [[0,1],[4,5],[2,3],[6,7]];
+      const wqf = new Int16Array(4);
+      for(let m=0;m<4;m++) wqf[m] = simKO(w16[QFP[m][0]], w16[QFP[m][1]], elo, params, rndKO);
+      const sf0 = simKO(wqf[0], wqf[1], elo, params, rndKO);
+      const sf1 = simKO(wqf[2], wqf[3], elo, params, rndKO);
+      const champ = simKO(sf0, sf1, elo, params, rndKO);
+      for(let gi=0; gi<12; gi++){ cR32[winners[gi]]++; cR32[runners[gi]]++; cWinG[winners[gi]]++; }
+      for(let k=0;k<8;k++) cR32[T[k]]++;
+      for(let m=0;m<16;m++) cR16[w32[m]]++;
+      for(let m=0;m<8;m++)  cQF[w16[m]]++;
+      for(let m=0;m<4;m++)  cSF[wqf[m]]++;
+      cFinal[sf0]++; cFinal[sf1]++;
+      cChamp[champ]++;
+    }
+    done += n;
+  }
+  return {
+    runChunk,
+    get done(){ return done; },
+    results(){
+      const P = arr => Array.from(arr, v => 100*v/done);
+      return { n: done, champ: P(cChamp), final: P(cFinal), sf: P(cSF), qf: P(cQF), r16: P(cR16), r32: P(cR32), winG: P(cWinG) };
+    }
+  };
+}
+</script>
+
+<script>
+'use strict';
+const state = {
+  params: { hostBonus:60, divGoals:300, muTotal:2.70 },
+  nSims: 10000,
+  constraints: new Map(),
+  baseline: null,
+  current: null,
+  selGroup: 'A',
+  selPair: 0,
+  runToken: 0,
+  showAll: false,
+};
+const $ = id => document.getElementById(id);
+const fmt1 = v => v.toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const fmt0 = v => Math.round(v).toLocaleString('fr-FR');
+const paramsHash = () => [state.params.hostBonus,state.params.divGoals,state.params.muTotal,state.nSims].join('|');
+const DAY_DATES = {1:'11–17 juin',2:'18–23 juin',3:'24–27 juin'};
+const SPECIAL = { 'A-0-1':'Ouverture · 11 juin', 'I-0-1':'16 juin', 'I-0-2':'22 juin', 'I-3-0':'26 juin' };
+
+function showToast(msg, duration = 2500) {
+  const toast = $('#toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function exportState() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    state: {
+      params: {...state.params},
+      nSims: state.nSims,
+      constraints: Object.fromEntries(state.constraints),
+      selGroup: state.selGroup,
+      selPair: state.selPair,
+      showAll: state.showAll
+    }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'cdm2026_etat_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+  showToast('✓ État exporté');
+}
+
+function importStateFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      importState(data);
+      showToast('✓ État importé');
+    } catch (err) {
+      showToast('✗ Fichier invalide');
+      console.error('Import error:', err);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function importState(data) {
+  if (!data || !data.state) {
+    showToast('✗ Format invalide');
+    return;
+  }
+  const s = data.state;
+  if (s.params) {
+    state.params.hostBonus = s.params.hostBonus !== undefined ? s.params.hostBonus : 60;
+    state.params.divGoals = s.params.divGoals !== undefined ? s.params.divGoals : 300;
+    state.params.muTotal = s.params.muTotal !== undefined ? s.params.muTotal : 2.70;
+    $('#pHost').value = state.params.hostBonus;
+    $('#pDiv').value = state.params.divGoals;
+    $('#pMu').value = state.params.muTotal;
+    $('#vHost').textContent = '+'+state.params.hostBonus+' Elo';
+    $('#vDiv').textContent = ''+state.params.divGoals;
+    $('#vMu').textContent = state.params.muTotal.toFixed(2).replace('.',',');
+  }
+  if (s.nSims) {
+    state.nSims = s.nSims;
+    const simsSelect = $('#pSims');
+    for (let opt of simsSelect.options) {
+      if (+opt.value === state.nSims) { opt.selected = true; break; }
+    }
+  }
+  state.constraints = new Map(s.constraints ? Object.entries(s.constraints) : []);
+  if (s.selGroup) state.selGroup = s.selGroup;
+  if (s.selPair !== undefined) state.selPair = s.selPair;
+  if (s.showAll !== undefined) state.showAll = s.showAll;
+  state.baseline = null;
+  state.current = null;
+  renderGroupSel();
+  renderMatches();
+  renderDetail();
+  renderTable();
+  renderStatus();
+  scheduleRun(500);
+}
+
+function saveToLocalStorage() {
+  try {
+    const data = {
+      version: 1,
+      savedAt: new Date().toISOString(),
+      state: {
+        params: {...state.params},
+        nSims: state.nSims,
+        constraints: Object.fromEntries(state.constraints),
+        selGroup: state.selGroup,
+        selPair: state.selPair,
+        showAll: state.showAll
+      }
+    };
+    localStorage.setItem('cdm2026_simulateur_state', JSON.stringify(data));
+  } catch (e) {
+    console.warn('Could not save to localStorage:', e);
+  }
+}
+
+function loadFromLocalStorage() {
+  try {
+    const saved = localStorage.getItem('cdm2026_simulateur_state');
+    if (saved) {
+      const data = JSON.parse(saved);
+      importState(data);
+      return true;
+    }
+  } catch (e) {
+    console.warn('Could not load from localStorage:', e);
+  }
+  return false;
+}
+
+function teamOf(L, k){ return TEAMS[GIDX[L][k]]; }
+function pairProbs(L, pi){
+  const [x,y] = PAIRS[pi];
+  const a = teamOf(L,x), b = teamOf(L,y);
+  return { a, b, x, y, m: matchProbs(effElo(a,state.params.hostBonus), effElo(b,state.params.hostBonus), state.params) };
+}
+
+function runSimPass(constraints, seed, token, progFrom, progTo){
+  return new Promise(resolve => {
+    const sim = createSimulation(state.params, constraints, seed);
+    const total = state.nSims, chunk = 1000;
+    (function step(){
+      if(token !== state.runToken) return resolve(null);
+      sim.runChunk(Math.min(chunk, total - sim.done));
+      const f = progFrom + (progTo-progFrom)*(sim.done/total);
+      $('progBar').style.width = (100*f).toFixed(1)+'%';
+      $('statusTxt').innerHTML = 'Simulation… <b>'+fmt0(sim.done)+'</b> / '+fmt0(total)+' tournois';
+      if(sim.done >= total) resolve(sim.results());
+      else setTimeout(step, 0);
+    })();
+  });
+}
+
+let runQueued = null;
+function scheduleRun(delay){
+  clearTimeout(runQueued);
+  runQueued = setTimeout(run, delay==null?350:delay);
+}
+
+async function run(){
+  const token = ++state.runToken;
+  const hash = paramsHash();
+  const hasCons = state.constraints.size > 0;
+  const needBase = !state.baseline || state.baseline.hash !== hash;
+  if(!hasCons){
+    const res = await runSimPass(null, 20260606, token, 0, 1);
+    if(!res) return;
+    state.baseline = { hash, res };
+    state.current = res;
+  } else {
+    if(needBase){
+      const base = await runSimPass(null, 20260606, token, 0, .5);
+      if(!base) return;
+      state.baseline = { hash, res: base };
+    }
+    const res = await runSimPass(state.constraints, 20260607, token, needBase?.5:0, 1);
+    if(!res) return;
+    state.current = res;
+  }
+  $('progBar').style.width = '100%';
+  $('statusTxt').innerHTML = '<b>'+fmt0(state.nSims)+'</b> tournois simulés';
+  renderTable();
+  renderStatus();
+  saveToLocalStorage();
+}
+
+function renderGroupSel(){
+  $('groupSel').innerHTML = GROUP_LETTERS.map(L => {
+    const top = GIDX[L].map(i=>TEAMS[i]).reduce((a,b)=>a.elo>b.elo?a:b);
+    return '<button class="gchip" data-g="'+L+'" aria-pressed="'+(L===state.selGroup)+'">'+'
+      '<span class="gl">'+L+'</span><span class="gf">'+top.flag+'</span></button>';
+  }).join('');
+  $('groupSel').querySelectorAll('.gchip').forEach(b => b.onclick = () => {
+    state.selGroup = b.dataset.g; state.selPair = 0;
+    renderGroupSel(); renderMatches(); renderDetail();
+  });
+}
+
+function renderMatches(){
+  const L = state.selGroup;
+  let html = '', lastDay = 0;
+  for(let pi=0; pi<6; pi++){
+    const d = PAIR_DAY[pi];
+    if(d !== lastDay){ html += '<div class="dayLbl">Journée '+d+' · '+DAY_DATES[d]+'</div>'; lastDay = d; }
+    const {a,b,m} = pairProbs(L,pi);
+    const key = L+'-'+PAIRS[pi][0]+'-'+PAIRS[pi][1];
+    const cons = state.constraints.get(key);
+    const sp = SPECIAL[key];
+    html += '<button class="ticket'+(pi===state.selPair?' sel':'')+'" data-pi="'+pi+'">'+'
+      '(cons ? '<span class="lock">verrouillé · '+(cons==='A'?'1':cons==='D'?'N':'2')+'</span>' : '')+
+      '<div class="row"><span class="tn">'+a.flag+' '+a.name+(sp?'<span class="badge">'+sp+'</span>':'')+'</span>'+'
+      '<span class="pct"><b class="pA">'+fmt0(100*m.pA)+'</b> · <b class="pN">'+fmt0(100*m.pN)+'</b> · <b class="pB">'+fmt0(100*m.pB)+'</b> %</span></div>'+'
+      '<div class="row" style="margin-top:2px"><span class="tn" style="font-size:14px;color:var(--muted)">'+b.flag+' '+b.name+'</span></div>'+'
+      '<div class="tribar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+'
+    '</button>';
+  }
+  $('matchList').innerHTML = html;
+  $('matchList').querySelectorAll('.ticket').forEach(t => t.onclick = () => {
+    state.selPair = +t.dataset.pi; renderMatches(); renderDetail();
+    if(window.innerWidth < 920) $('detail').scrollIntoView({behavior:'smooth',block:'start'});
+    saveToLocalStorage();
+  });
+}
+
+function aggGrid(m){
+  const A = []; for(let i=0;i<7;i++) A.push(new Float64Array(7));
+  for(let i=0;i<=m.N;i++) for(let j=0;j<=m.N;j++) A[Math.min(i,6)][Math.min(j,6)] += m.grid[i][j];
+  return A;
+}
+
+function renderDetail(){
+  const L = state.selGroup, pi = state.selPair;
+  const {a,b,m} = pairProbs(L,pi);
+  const key = L+'-'+PAIRS[pi][0]+'-'+PAIRS[pi][1];
+  const cons = state.constraints.get(key);
+  const sp = SPECIAL[key];
+  const G = aggGrid(m);
+  let maxP = 0; for(let i=0;i<7;i++) for(let j=0;j<7;j++) maxP = Math.max(maxP, G[i][j]);
+  const mi = Math.min(m.best[0],6), mj = Math.min(m.best[1],6);
+  let hm = '<div class="c lab"></div>';
+  for(let j=0;j<7;j++) hm += '<div class="c lab">'+(j===6?'6+':j)+'</div>';
+  for(let i=0;i<7;i++){
+    hm += '<div class="c lab">'+(i===6?'6+':i)+'</div>';
+    for(let j=0;j<7;j++){
+      const p = G[i][j], al = Math.pow(p/maxP, .65)*.92;
+      hm += '<div class="c'+(i===mi&&j===mj?' mode':'')+'" style="background:rgba(88,194,129,'+al.toFixed(3)+')" title="'+(i===6?'6+':i)+'–'+(j===6?'6+':j)+' : '+fmt1(100*p)+' %">'+(p>=.03?fmt0(100*p):'')+'</div>';
+    }
+  }
+  $('detail').innerHTML =
+    '<div class="ctx">Groupe '+L+' · Journée '+PAIR_DAY[pi]+(sp?' · '+sp:' · '+DAY_DATES[PAIR_DAY[pi]])+'</div>'+'
+    '<div class="vs">'+'
+      '<div class="side"><div class="nm"><span class="fl">'+a.flag+'</span> '+a.name+'</div><div class="elo">Elo '+a.elo+(a.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+'
+      '<div class="x">VS</div>'+'
+      '<div class="side r"><div class="nm">'+b.name+' <span class="fl">'+b.flag+'</span></div><div class="elo">Elo '+b.elo+(b.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+'
+    '</div>'+'
+    '<div class="big3">'+'
+      '<div class="b"><div class="v pA">'+fmt1(100*m.pA)+' %</div><div class="l">1 · '+a.name+'</div></div>'+'
+      '<div class="b"><div class="v pN">'+fmt1(100*m.pN)+' %</div><div class="l">N · Nul</div></div>'+'
+      '<div class="b"><div class="v pB">'+fmt1(100*m.pB)+' %</div><div class="l">2 · '+b.name+'</div></div>'+'
+    '</div>'+'
+    '<div class="tribar bigbar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+'
+    '<div class="facts">'+'
+      '<span>Score le plus probable <b>'+m.best[0]+' – '+m.best[1]+'</b> ('+fmt1(100*m.bestP)+' %)</span>'+'
+      '<span>Buts attendus <b>'+m.la.toFixed(2).replace('.',',')+'</b> / <b>'+m.lb.toFixed(2).replace('.',',')+'</b></span>'+'
+    '</div>'+'
+    '<div class="hmwrap"><div class="hmcap"><span>Distribution des scores (%) — lignes : '+a.name+' · colonnes : '+b.name+'</span></div><div class="hm">'+hm+'</div></div>'+'
+    '<div class="forceRow">'+'
+      '<div class="ft">Verrouiller le résultat :</div>'+'
+      '<div class="chips">'+'
+        '<button class="chip'+(cons==='A'?' on':'')+'" data-o="A">1 · '+a.name+'</button>'+'
+        '<button class="chip'+(cons==='D'?' on':'')+'" data-o="D">N · Nul</button>'+'
+        '<button class="chip'+(cons==='B'?' on':'')+'" data-o="B">2 · '+b.name+'</button>'+'
+        '<button class="chip free'+(!cons?' on':'')+'" data-o="">Libre</button>'+'
+      '</div>'+'
+      '<div class="forceNote">Le verrou impose le résultat à chaque tournoi simulé.</div>'+'
+    '</div>';
+  $('detail').querySelectorAll('.chip').forEach(c => c.onclick = () => {
+    const o = c.dataset.o;
+    if(!o) state.constraints.delete(key); else state.constraints.set(key, o);
+    renderMatches(); renderDetail(); renderStatus();
+    scheduleRun();
+    saveToLocalStorage();
+  });
+}
+
+function renderTable(){
+  const res = state.current; if(!res) return;
+  const hasCons = state.constraints.size > 0;
+  const base = state.baseline ? state.baseline.res : null;
+  $('thDelta').hidden = !hasCons;
+  $('tourneyCtx').textContent = hasCons ? 'scénario : '+state.constraints.size+' résultat'+(state.constraints.size>1?'s':'')+' verrouillé'+(state.constraints.size>1?'s':'') : 'scénario libre';
+  const list = TEAMS.map((t,i)=>({
+    t, c:res.champ[i], f:res.final[i], s:res.sf[i], q:res.r32[i],
+    d:(hasCons&&base)?(res.champ[i]-base.champ[i]):0
+  })).sort((a,b)=>b.c-a.c);
+  const maxC = Math.max(...list.map(r=>r.c), 1);
+  const shown = state.showAll ? list : list.slice(0,14);
+  $('tbody').innerHTML = shown.map(r => {
+    const dCls = r.d > .05 ? 'dpos' : r.d < -.05 ? 'dneg' : 'dzero';
+    const dTxt = r.d > .05 ? '▲ '+fmt1(r.d) : r.d < -.05 ? '▼ '+fmt1(-r.d) : '·';
+    return '<tr>'+'
+      '<td class="team"><span class="fl">'+r.t.flag+'</span>'+r.t.name+'<span class="gp">'+r.t.group+'</span></td>'+'
+      '<td><span class="tbar" style="width:'+(54*r.c/maxC).toFixed(0)+'px"></span>'+fmt1(r.c)+'</td>'+'
+      '(state.constraints.size>0?'<td class="'+dCls+'">'+dTxt+'</td>':'')+'
+      '<td>'+fmt1(r.f)+'</td><td>'+fmt1(r.s)+'</td><td>'+fmt1(r.q)+'</td>'+'
+    '</tr>';
+  }).join('');
+  $('moreBtn').textContent = state.showAll ? 'Réduire' : 'Afficher les 48 équipes';
+  $('tnote').textContent = 'Titre / Finale / Demie : probabilité d’atteindre ce stade. Qualif. : accès aux 16es. '+
+    (hasCons?'Δ : écart en points de % face au scénario libre.':'');
+  $('foot').textContent = 'Modèle Elo→Poisson. Bonus hôte +'+state.params.hostBonus+' Elo, '+state.params.divGoals+' Elo/but, '+state.params.muTotal.toFixed(2).replace('.',',')+' buts/match. '+fmt0(state.nSims)+' simulations.';
+}
+
+function renderStatus(){
+  const n = state.constraints.size;
+  $('consTxt').hidden = n===0;
+  $('clearCons').hidden = n===0;
+  if(n>0) $('consTxt').textContent = '🔒 '+n+' verrou'+(n>1?'s':'');
+}
+
+$('gearBtn').onclick = () => {
+  const open = $('paramsBar').classList.toggle('open');
+  $('gearBtn').setAttribute('aria-expanded', open);
+};
+
+function bindParam(id, lblId, set, fmt){
+  $(id).addEventListener('input', e => {
+    set(+e.target.value);
+    $(lblId).textContent = fmt(+e.target.value);
+    renderMatches(); renderDetail();
+    scheduleRun(600);
+    saveToLocalStorage();
+  });
+}
+
+bindParam('pHost','vHost', v=>state.params.hostBonus=v, v=>'+'+v+' Elo');
+bindParam('pDiv','vDiv', v=>state.params.divGoals=v, v=>''+v);
+bindParam('pMu','vMu', v=>state.params.muTotal=v, v=>v.toFixed(2).replace('.',','));
+
+$('pSims').addEventListener('change', e => { 
+  state.nSims = +e.target.value; 
+  scheduleRun(50); 
+  saveToLocalStorage();
+});
+
+$('clearCons').onclick = () => { 
+  state.constraints.clear(); 
+  renderMatches(); renderDetail(); renderStatus(); 
+  scheduleRun(50);
+  saveToLocalStorage();
+};
+
+$('moreBtn').onclick = () => { 
+  state.showAll = !state.showAll; 
+  renderTable(); 
+  saveToLocalStorage();
+};
+
+$('exportBtn').onclick = exportState;
+$('importBtn').onclick = () => $('#importFile').click();
+$('importFile').addEventListener('change', importStateFromFile);
+
+const loadedFromStorage = loadFromLocalStorage();
+if (!loadedFromStorage) {
+  renderGroupSel();
+  renderMatches();
+  renderDetail();
+  renderStatus();
+  run();
+}
+
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  document.addEventListener('touchmove', function(event) {
+    if (event.scale !== 1) { event.preventDefault(); }
+  }, { passive: false });
+}
+
+window.addEventListener('pagehide', saveToLocalStorage);
+window.addEventListener('beforeunload', saveToLocalStorage);
+</script>
+</body>
+</html>
