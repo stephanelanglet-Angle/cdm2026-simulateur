@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Castrol Legends · Stratège de pronos</title>
+<style>
+:root{
+  --bg:#0C1A16;--panel:#122620;--panel2:#16302A;--line:#24433A;--line2:#2F564A;
+  --chalk:#ECF5EF;--muted:#8FAEA2;--faint:#5E7A70;--grass:#58C281;--gold:#E9C46A;--clay:#E07A6B;
+  --you:#E9C46A;
+  --body:-apple-system,'Segoe UI',Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--chalk);font-family:var(--body);font-size:14.5px;line-height:1.45;padding:0 0 60px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 14px}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+header{padding:22px 0 10px}
+h1{font-size:26px;letter-spacing:.5px}
+h1 .g{color:var(--gold)}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.btn{border:1px solid var(--line2);border-radius:8px;padding:7px 13px;font-size:13px;background:var(--panel2);color:var(--chalk)}
+.btn:hover{border-color:var(--grass)}
+.btn.primary{border-color:var(--grass);background:#16352A}
+#syncStatus{font-size:12.5px;color:var(--muted)}
+.card{border:1px solid var(--line);background:var(--panel);border-radius:13px;padding:15px;margin:14px 0}
+.card h2{font-size:16px;text-transform:uppercase;letter-spacing:.6px;margin-bottom:11px}
+.card h2 small{color:var(--faint);text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;margin-left:8px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.l,th.l{text-align:left}
+tr.you td{background:#1C3A30}
+.mono{font-family:var(--mono)}
+.pos{color:var(--faint);width:26px}
+.pts{font-family:var(--mono);font-weight:700}
+.lead{color:var(--gold)}
+.grid2{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:900px){.grid2{grid-template-columns:1.05fr 1fr}}
+.groups{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.gchip{border:1px solid var(--line2);border-radius:8px;padding:5px 11px;font-weight:700;font-family:var(--mono);background:var(--panel2)}
+.gchip.on{border-color:var(--gold);background:#1C3A30;color:var(--gold)}
+.mlist{display:flex;flex-direction:column;gap:7px}
+.mrow{border:1px solid var(--line2);border-radius:10px;background:var(--panel2);padding:9px 11px;text-align:left;width:100%;position:relative}
+.mrow:hover{border-color:var(--grass)}
+.mrow.sel{border-color:var(--gold);background:#1C3A30}
+.mrow.done{opacity:.78}
+.mrow .t{font-weight:600}
+.mrow .meta{color:var(--faint);font-size:11.5px;font-family:var(--mono);margin-top:2px}
+.scoreTag{position:absolute;right:11px;top:9px;font-family:var(--mono);font-weight:700}
+.scoreTag.res{color:var(--grass)}
+.scoreTag.up{color:var(--muted)}
+.dist{display:grid;grid-template-columns:auto repeat(7,1fr);gap:2px;font-family:var(--mono);font-size:11px;margin:8px 0}
+.dist .c{padding:3px 0;text-align:center;border-radius:3px}
+.dist .lab{color:var(--faint)}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
+.kv b{font-family:var(--mono)}
+.pill{display:inline-block;border-radius:6px;padding:1px 8px;font-family:var(--mono);font-weight:700;font-size:13px}
+.pill.ev{background:#1d3a2e;color:var(--grass);border:1px solid var(--line2)}
+.pill.win{background:#3a3320;color:var(--gold);border:1px solid var(--line2)}
+input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;color:var(--chalk);
+  font-family:var(--mono);text-align:center;padding:4px;font-size:13px}
+.reco{border:1px solid var(--gold);border-radius:10px;background:#1a1d12;padding:11px;margin-top:10px}
+.reco .big{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--gold)}
+.note{color:var(--faint);font-size:12px;margin-top:8px}
+.warn{color:var(--clay)}
+.tbl-scroll{overflow-x:auto}
+.tag{font-size:10.5px;font-family:var(--mono);border:1px solid var(--line2);border-radius:5px;padding:0 5px;color:var(--muted)}
+.foot{color:var(--faint);font-size:12px;margin-top:20px;text-align:center}
+.editrow{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 0}
+.editrow .nm{flex:1;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Castrol <span class="g">Legends</span> · Stratège de pronos</h1>
+  <div class="sub">Optimise tes pronostics pour <b>gagner le concours</b> — pas seulement marquer des points. Modèle Elo + Poisson, barème 4/3/2/0.</div>
+  <div class="bar">
+    <a class="btn" href="index.html">← Simulateur</a>
+    <button class="btn" id="syncBtn">☁️ Synchroniser</button>
+    <span id="syncStatus"></span>
+    <span style="flex:1"></span>
+    <button class="btn" id="paramBtn">⚙️ Paramètres modèle</button>
+  </div>
+  <div id="paramBox" class="card" style="display:none">
+    <h2>Paramètres du modèle <small>partagés avec ton simulateur principal si présents</small></h2>
+    <div class="bar">
+      <label>Bonus hôte <input class="sc" id="pHost" style="width:60px"></label>
+      <label>Diviseur buts <input class="sc" id="pDiv" style="width:60px"></label>
+      <label>Buts/match <input class="sc" id="pMu" style="width:60px"></label>
+      <button class="btn primary" id="pApply">Appliquer</button>
+    </div>
+  </div>
+</header>
+
+<div class="card">
+  <h2>Classement <small id="standCtx"></small></h2>
+  <div class="tbl-scroll"><table id="standTbl"></table></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Matchs</h2>
+    <div class="groups" id="groupSel"></div>
+    <div class="mlist" id="matchList"></div>
+  </div>
+  <div class="card" id="detail"><div class="note">Sélectionne un match à gauche.</div></div>
+</div>
+
+<div class="card">
+  <h2>Style des adversaires <small>déduit de leurs pronos passés — sert à projeter leurs futurs choix</small></h2>
+  <div class="tbl-scroll"><table id="styleTbl"></table></div>
+</div>
+
+<div class="foot">Castrol Legends · données initiales = 8 matchs joués. Les pronos des autres sont cachés avant le coup d'envoi : on projette leur style. Réglages bonus à venir.</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+'use strict';
+
+/* ======================= DONNÉES ======================= */
+const HOSTS = new Set(['Mexique','Etats-Unis','Canada']);
+const ELO = {
+  'Mexique':1800,'Corée du Sud':1760,'Afrique du Sud':1640,'Tchéquie':1780,
+  'Canada':1750,'Suisse':1897,'Qatar':1675,'Bosnie':1690,
+  'Brésil':1988,'Maroc':1845,'Écosse':1770,'Haïti':1560,
+  'Etats-Unis':1790,'Paraguay':1730,'Australie':1715,'Turquie':1880,
+  'Allemagne':1925,'Equateur':1935,"Côte d'Ivoire":1745,'Curaçao':1565,
+  'Pays-Bas':1944,'Japon':1879,'Suède':1790,'Tunisie':1685,
+  'Belgique':1849,'Iran':1800,'Egypte':1660,'Nouvelle-Zélande':1505,
+  'Espagne':2155,'Uruguay':1890,'Arabie saoudite':1635,'Cap-Vert':1615,
+  'France':2062,'Sénégal':1869,'Norvège':1917,'Irak':1600,
+  'Argentine':2113,'Autriche':1785,'Algérie':1760,'Jordanie':1605,
+  'Portugal':1984,'Colombie':1977,'Ouzbékistan':1680,'RD Congo':1680,
+  'Angleterre':2020,'Croatie':1908,'Panama':1650,'Ghana':1635,
+};
+const GROUPS = {
+  A:['Mexique','Corée du Sud','Afrique du Sud','Tchéquie'],
+  B:['Canada','Suisse','Qatar','Bosnie'],
+  C:['Brésil','Maroc','Écosse','Haïti'],
+  D:['Etats-Unis','Paraguay','Australie','Turquie'],
+  E:['Allemagne','Equateur',"Côte d'Ivoire",'Curaçao'],
+  F:['Pays-Bas','Japon','Suède','Tunisie'],
+  G:['Belgique','Iran','Egypte','Nouvelle-Zélande'],
+  H:['Espagne','Uruguay','Arabie saoudite','Cap-Vert'],
+  I:['France','Sénégal','Norvège','Irak'],
+  J:['Argentine','Autriche','Algérie','Jordanie'],
+  K:['Portugal','Colombie','Ouzbékistan','RD Congo'],
+  L:['Angleterre','Croatie','Panama','Ghana'],
+};
+const PLAYERS = ['Martin_Hamburg','Sven','Fakhrin','General','Frank','Stéphane','Ahmed','Jürgen','Mike'];
+const ME = 'Stéphane';
+
+// 8 matchs joués (orientation = grille du concours), résultat + pronos des 9 joueurs
+const PLAYED = [
+  { g:'A', home:'Mexique',      away:'Afrique du Sud', res:[2,0] },
+  { g:'A', home:'Corée du Sud', away:'Tchéquie',       res:[2,1] },
+  { g:'B', home:'Canada',       away:'Bosnie',         res:[1,1] },
+  { g:'D', home:'Etats-Unis',   away:'Paraguay',       res:[4,1] },
+  { g:'B', home:'Qatar',        away:'Suisse',         res:[1,1] },
+  { g:'C', home:'Brésil',       away:'Maroc',          res:[1,1] },
+  { g:'C', home:'Haïti',        away:'Écosse',         res:[0,1] },
+  { g:'D', home:'Australie',    away:'Turquie',        res:[2,0] },
+];
+const PRED0 = {
+  'Martin_Hamburg':[[2,0],[1,1],[1,1],[2,1],[0,2],[1,1],[0,1],[1,2]],
+  'Sven':          [[2,0],[1,1],[1,1],[2,1],[0,2],[2,0],[1,2],[0,2]],
+  'Fakhrin':       [[3,1],[2,3],[1,1],[2,1],[1,3],[4,1],[0,2],[1,3]],
+  'General':       [[3,1],[0,2],[1,1],[2,1],[0,3],[1,2],[0,3],[1,3]],
+  'Frank':         [[2,1],[1,1],[1,2],[2,1],[1,3],[1,1],[1,2],[0,2]],
+  'Stéphane':      [[2,1],[1,1],[1,0],[1,0],[1,0],[1,1],[1,1],[1,2]],
+  'Ahmed':         [[3,1],[1,2],[1,2],[1,0],[1,3],[1,2],[0,2],[1,3]],
+  'Jürgen':        [[3,0],[0,4],[2,3],[0,3],[1,3],[3,1],[0,2],[1,3]],
+  'Mike':          [null,null,null,null,null,null,null,null],
+};
+
+/* ======================= ÉTAT ======================= */
+const P = { hostBonus:60, divGoals:300, muTotal:2.70 };
+(function loadParams(){
+  try{ const d=JSON.parse(localStorage.getItem('cdm2026_simulateur_state')||'{}');
+    if(d.state&&d.state.params){ const q=d.state.params;
+      if(q.hostBonus!=null)P.hostBonus=q.hostBonus; if(q.divGoals!=null)P.divGoals=q.divGoals; if(q.muTotal!=null)P.muTotal=q.muTotal; } }catch(e){}
+})();
+
+let MATCHES = [];   // {id,g,home,away,res|null,preds:{player:[a,b]|null}}
+function buildMatches(){
+  MATCHES = [];
+  let id=0;
+  // joués d'abord
+  PLAYED.forEach((m,i)=>{
+    const preds={};
+    PLAYERS.forEach(pl=>{ preds[pl] = (PRED0[pl] && PRED0[pl][i]) ? PRED0[pl][i].slice() : null; });
+    MATCHES.push({ id:id++, g:m.g, home:m.home, away:m.away, res:m.res.slice(), preds });
+  });
+  // restants : toutes les paires de chaque groupe non encore jouées
+  Object.keys(GROUPS).forEach(g=>{
+    const t=GROUPS[g];
+    const combos=[[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+    combos.forEach(([a,b])=>{
+      const set=new Set([t[a],t[b]]);
+      const exists = MATCHES.some(m=>m.g===g && new Set([m.home,m.away]).size===2 && set.has(m.home) && set.has(m.away));
+      if(!exists){
+        const preds={}; PLAYERS.forEach(pl=>preds[pl]=null);
+        MATCHES.push({ id:id++, g, home:t[a], away:t[b], res:null, preds });
+      }
+    });
+  });
+}
+buildMatches();
+
+/* ======================= MOTEUR Elo+Poisson ======================= */
+function clamp(x,a,b){return x<a?a:(x>b?b:x);}
+function effElo(n){ return (ELO[n]||1700) + (HOSTS.has(n)?P.hostBonus:0); }
+function lambdas(ea,eb){ const s=(ea-eb)/P.divGoals; return [clamp((P.muTotal+s)/2,0.12,6),clamp((P.muTotal-s)/2,0.12,6)]; }
+function poiss(l,n){ const a=[]; let p=Math.exp(-l); for(let k=0;k<=n;k++){a.push(p);p*=l/(k+1);} return a; }
+function grid(home,away){
+  const [la,lb]=lambdas(effElo(home),effElo(away)); const N=8;
+  const pa=poiss(la,N), pb=poiss(lb,N), g=[];
+  let modal=[0,0],mp=-1,pH=0,pD=0,pA=0;
+  for(let i=0;i<=N;i++){g.push([]);for(let j=0;j<=N;j++){const q=pa[i]*pb[j];g[i][j]=q;
+    if(i>j)pH+=q;else if(i===j)pD+=q;else pA+=q; if(q>mp){mp=q;modal=[i,j];}}}
+  return {g,N,la,lb,modal,pH,pD,pA};
+}
+// barème 4/3/2/0
+function pts(pa,pb,aa,ab){
+  if(pa===aa&&pb===ab) return 4;
+  const pd=pa-pb, ad=aa-ab, ps=Math.sign(pd), as=Math.sign(ad);
+  if(ps!==as) return 0;
+  if(pd===ad && ad!==0) return 3;
+  return 2;
+}
+function expPoints(pred,G){
+  let e=0; for(let i=0;i<=G.N;i++)for(let j=0;j<=G.N;j++) e+=G.g[i][j]*pts(pred[0],pred[1],i,j);
+  return e;
+}
+function bestEV(G){
+  let best=[0,0],be=-1;
+  for(let a=0;a<=6;a++)for(let b=0;b<=6;b++){ const e=expPoints([a,b],G); if(e>be){be=e;best=[a,b];} }
+  return {pred:best,ev:be};
+}
+
+/* ======================= STYLE DES ADVERSAIRES ======================= */
+// goalFactor = combien un joueur prédit de buts vs la moyenne du modèle sur les matchs déjà pronostiqués
+function playerStyle(){
+  const st={};
+  // moyenne du total de buts attendu par le modèle sur les matchs joués (référence)
+  let modelTot=0,nM=0;
+  MATCHES.filter(m=>m.res).forEach(m=>{ const G=grid(m.home,m.away); modelTot+=(G.la+G.lb); nM++; });
+  const modelAvg = nM? modelTot/nM : P.muTotal;
+  PLAYERS.forEach(pl=>{
+    let tot=0,n=0,draws=0,exact=0,scored=0;
+    MATCHES.filter(m=>m.res).forEach(m=>{
+      const pr=m.preds[pl]; if(!pr)return;
+      tot+=pr[0]+pr[1]; n++; if(pr[0]===pr[1])draws++;
+      const pt=pts(pr[0],pr[1],m.res[0],m.res[1]); scored+=pt; if(pt===4)exact++;
+    });
+    st[pl]={ n, goalAvg:n?tot/n:modelAvg, goalFactor:n?(tot/n)/modelAvg:1, drawRate:n?draws/n:0, exact, scored };
+  });
+  return {st, modelAvg};
+}
+// projection du prono d'un joueur sur un match à venir
+function projectPick(pl, G, style){
+  const s=style.st[pl];
+  const f = s && s.n ? s.goalFactor : 1;
+  let a=G.la*f, b=G.lb*f;
+  // léger ajustement nul : si le joueur aime les nuls et le match est serré, rapprocher
+  let pa=Math.round(a), pb=Math.round(b);
+  if(s && s.drawRate>0.34 && Math.abs(G.la-G.lb)<0.35){ const m=Math.round((a+b)/2); pa=m; pb=m; }
+  return [Math.max(0,pa), Math.max(0,pb)];
+}
+
+/* ======================= CLASSEMENT ======================= */
+function standings(){
+  const tot={}; PLAYERS.forEach(p=>tot[p]=0);
+  MATCHES.forEach(m=>{ if(!m.res)return;
+    PLAYERS.forEach(pl=>{ const pr=m.preds[pl]; if(pr) tot[pl]+=pts(pr[0],pr[1],m.res[0],m.res[1]); });
+  });
+  const rows=PLAYERS.map(p=>({p,pts:tot[p]})).sort((x,y)=>y.pts-x.pts);
+  let pos=0,last=null,seen=0;
+  rows.forEach(r=>{ seen++; if(r.pts!==last){pos=seen;last=r.pts;} r.pos=pos; });
+  return rows;
+}
+
+/* ======================= SIMULATION POUR GAGNER ======================= */
+let RNG = (function(){ let a=20260614>>>0; return function(){ a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296; }; })();
+function sampleScore(G){ const u=RNG(); let c=0; for(let i=0;i<=G.N;i++)for(let j=0;j<=G.N;j++){ c+=G.g[i][j]; if(u<=c) return [i,j]; } return G.modal; }
+
+function winSim(selMatch, candidates, nSims){
+  const style=playerStyle();
+  const base=standings(); const cur={}; base.forEach(r=>cur[r.p]=r.pts);
+  const remaining = MATCHES.filter(m=>!m.res);
+  // pré-calcul par match restant : grille, pick EV (utilisateur), pick projeté (adversaires)
+  const info = remaining.map(m=>{
+    const G=grid(m.home,m.away);
+    const meEV=bestEV(G).pred;
+    const opp={}; PLAYERS.forEach(pl=>{ if(pl!==ME) opp[pl]=projectPick(pl,G,style); });
+    return {m,G,meEV,opp};
+  });
+  const others = PLAYERS.filter(p=>p!==ME);
+  const wins = candidates.map(()=>0);
+  for(let s=0;s<nSims;s++){
+    // base : total de chacun sur tous les matchs restants ; pour MOI on exclut le match sélectionné
+    const add={}; PLAYERS.forEach(p=>add[p]=0);
+    let selResult=null;
+    info.forEach(it=>{
+      const r=sampleScore(it.G);
+      if(it.m.id===selMatch.id){ selResult=r; }
+      others.forEach(pl=>{ const pk=it.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
+      if(it.m.id!==selMatch.id){ add[ME]+=pts(it.meEV[0],it.meEV[1],r[0],r[1]); }
+    });
+    const oMax = Math.max.apply(null, others.map(p=>cur[p]+add[p]));
+    const myBase = cur[ME]+add[ME];
+    candidates.forEach((c,ci)=>{
+      const mine = myBase + (selResult? pts(c[0],c[1],selResult[0],selResult[1]) : 0);
+      if(mine>=oMax) wins[ci]++;
+    });
+  }
+  return candidates.map((c,ci)=>({pred:c, winP:wins[ci]/nSims}));
+}
+
+/* ======================= UI ======================= */
+const $=id=>document.getElementById(id);
+let selGroup='A', selId=MATCHES.find(m=>!m.res)? MATCHES.find(m=>!m.res).id : 0;
+
+function fmtPred(p){ return p? p[0]+'-'+p[1] : '—'; }
+function renderStandings(){
+  const rows=standings();
+  let h='<thead><tr><th class="pos"></th><th class="l">Joueur</th><th>Points</th><th>Joués</th><th>Restant à jouer</th></tr></thead><tbody>';
+  const playedN = MATCHES.filter(m=>m.res).length;
+  rows.forEach(r=>{
+    const styleN = MATCHES.filter(m=>m.res && m.preds[r.p]).length;
+    h+=`<tr class="${r.p===ME?'you':''}"><td class="pos">${r.pos}</td><td class="l">${r.p}${r.p===ME?' ⭐':''}</td>`+
+       `<td class="pts ${r.pos===1?'lead':''}">${r.pts}</td><td class="mono">${styleN}/${playedN}</td>`+
+       `<td class="mono" style="color:var(--faint)">${MATCHES.filter(m=>!m.res).length} matchs</td></tr>`;
+  });
+  h+='</tbody>';
+  $('standTbl').innerHTML=h;
+  const me=rows.find(r=>r.p===ME), lead=rows[0];
+  $('standCtx').textContent = `tu es ${me.pos}ᵉ à ${lead.pts-me.pts} pt(s) du leader (${lead.p})`;
+}
+
+function renderGroups(){
+  $('groupSel').innerHTML = Object.keys(GROUPS).map(g=>`<button class="gchip ${g===selGroup?'on':''}" data-g="${g}">${g}</button>`).join('');
+  $('groupSel').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{selGroup=b.dataset.g;renderMatchList();});
+}
+function renderMatchList(){
+  renderGroups();
+  const ms=MATCHES.filter(m=>m.g===selGroup);
+  $('matchList').innerHTML = ms.map(m=>{
+    const tag = m.res? `<span class="scoreTag res">${m.res[0]}-${m.res[1]}</span>` : `<span class="scoreTag up">à venir</span>`;
+    return `<button class="mrow ${m.id===selId?'sel':''} ${m.res?'done':''}" data-id="${m.id}">${tag}`+
+      `<div class="t">${m.home} <span style="color:var(--faint)">vs</span> ${m.away}</div>`+
+      `<div class="meta">Groupe ${m.g} · Elo ${Math.round(effElo(m.home))} – ${Math.round(effElo(m.away))}</div></button>`;
+  }).join('');
+  $('matchList').querySelectorAll('.mrow').forEach(b=>b.onclick=()=>{selId=+b.dataset.id;renderMatchList();renderDetail();});
+}
+
+function distRow(G){
+  // top scorelines
+  const cells=[];
+  for(let i=0;i<=6;i++)for(let j=0;j<=6;j++) cells.push({i,j,p:G.g[i][j]});
+  cells.sort((a,b)=>b.p-a.p);
+  return cells.slice(0,6).map(c=>`<span class="tag">${c.i}-${c.j} · ${(100*c.p).toFixed(1)}%</span>`).join(' ');
+}
+
+function renderDetail(){
+  const m=MATCHES.find(x=>x.id===selId);
+  if(!m){ $('detail').innerHTML='<div class="note">—</div>'; return; }
+  const G=grid(m.home,m.away);
+  const style=playerStyle();
+  let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Groupe ${m.g}</small></h2>`;
+  h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(0)}% · Nul ${(100*G.pD).toFixed(0)}% · ${m.away} ${(100*G.pA).toFixed(0)}%</b></div>`;
+  h+=`<div class="kv"><span>Buts attendus (modèle)</span><b>${G.la.toFixed(2)} – ${G.lb.toFixed(2)}</b></div>`;
+  h+=`<div class="note">Scores les plus probables : ${distRow(G)}</div>`;
+
+  if(m.res){
+    h+=`<div class="kv" style="margin-top:10px"><span>Résultat</span><b style="color:var(--grass)">${m.res[0]} – ${m.res[1]}</b></div>`;
+    h+=`<div class="tbl-scroll"><table style="margin-top:8px"><thead><tr><th class="l">Joueur</th><th>Prono</th><th>Pts</th></tr></thead><tbody>`;
+    standings().forEach(r=>{ const pr=m.preds[r.p];
+      h+=`<tr class="${r.p===ME?'you':''}"><td class="l">${r.p}</td><td class="mono">${fmtPred(pr)}</td><td class="pts">${pr?pts(pr[0],pr[1],m.res[0],m.res[1]):'—'}</td></tr>`; });
+    h+=`</tbody></table></div>`;
+    h+=`<div class="editrow" style="margin-top:10px"><span class="nm">Corriger le résultat</span>`+
+       `<input class="sc" id="rA" value="${m.res[0]}"><input class="sc" id="rB" value="${m.res[1]}">`+
+       `<button class="btn" id="rSave">OK</button></div>`;
+  } else {
+    const ev=bestEV(G);
+    h+=`<div class="kv" style="margin-top:10px"><span>Prono à <b>points espérés</b> max</span><span class="pill ev">${ev.pred[0]}-${ev.pred[1]} · ${ev.ev.toFixed(2)} pts</span></div>`;
+    // projections adversaires
+    h+=`<div class="note" style="margin-top:8px">Pronos probables des adversaires (projetés depuis leur style) :</div>`;
+    h+=`<div style="margin-top:5px">`+ PLAYERS.filter(p=>p!==ME).map(pl=>{
+      const pk=projectPick(pl,G,style); return `<span class="tag" style="margin:2px">${pl.split('_')[0]}: ${pk[0]}-${pk[1]}</span>`; }).join(' ')+`</div>`;
+    // reco gagnante
+    h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
+       `<button class="btn primary" id="winBtn">Calculer</button></div>`+
+       `<div id="recoOut" class="note">Lance le calcul : je simule la fin du tournoi des milliers de fois et je classe tes options par <b>probabilité de finir 1ᵉʳ</b>.</div></div>`;
+    // saisie pronos
+    h+=`<div style="margin-top:12px"><div class="kv"><span>Saisir les pronos (le tien + ceux des autres une fois visibles)</span><span></span></div>`;
+    PLAYERS.forEach(pl=>{ const pr=m.preds[pl];
+      h+=`<div class="editrow"><span class="nm">${pl}${pl===ME?' ⭐':''}</span>`+
+         `<input class="sc pin" data-pl="${pl}" data-k="0" value="${pr?pr[0]:''}">`+
+         `<input class="sc pin" data-pl="${pl}" data-k="1" value="${pr?pr[1]:''}"></div>`; });
+    h+=`<div class="editrow"><span class="nm">Résultat final (quand joué)</span>`+
+       `<input class="sc" id="rA" value=""><input class="sc" id="rB" value=""><button class="btn" id="rSave">Enregistrer</button></div></div>`;
+  }
+  $('detail').innerHTML=h;
+  wireDetail(m,G);
+}
+
+function wireDetail(m,G){
+  const rSave=$('rSave');
+  if(rSave) rSave.onclick=()=>{ const a=parseInt($('rA').value,10), b=parseInt($('rB').value,10);
+    if(Number.isFinite(a)&&Number.isFinite(b)){ m.res=[a,b]; afterEdit(); } };
+  document.querySelectorAll('.pin').forEach(inp=>{ inp.addEventListener('change',()=>{
+    const pl=inp.dataset.pl;
+    const ins=Array.from(document.querySelectorAll(`.pin`)).filter(x=>x.dataset.pl===pl);
+    const a=parseInt(ins[0].value,10), b=parseInt(ins[1].value,10);
+    if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; saveLocal(); cloudMaybePush(); }
+    else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; saveLocal(); cloudMaybePush(); }
+  }); });
+  const wb=$('winBtn');
+  if(wb) wb.onclick=()=>runWin(m,G);
+}
+function runWin(m,G){
+  $('recoOut').innerHTML='⏳ Simulation en cours…';
+  setTimeout(()=>{
+    // candidats : top scorelines probables + le prono EV + quelques audacieux différenciés
+    const cells=[]; for(let i=0;i<=6;i++)for(let j=0;j<=6;j++)cells.push({k:[i,j],p:G.g[i][j]});
+    cells.sort((a,b)=>b.p-a.p);
+    const cand=[]; const seen=new Set();
+    const push=k=>{ const s=k[0]+'-'+k[1]; if(!seen.has(s)){seen.add(s);cand.push(k);} };
+    push(bestEV(G).pred);
+    cells.slice(0,7).forEach(c=>push(c.k));
+    const res=winSim(m,cand,2500).sort((a,b)=>b.winP-a.winP);
+    const best=res[0];
+    let h=`<div class="big">${best.pred[0]} – ${best.pred[1]}</div>`+
+      `<div class="note">Meilleure probabilité de finir 1ᵉʳ du concours : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b></div>`;
+    h+=`<table style="margin-top:8px"><thead><tr><th>Ton prono</th><th>P(1ᵉʳ)</th><th>Pts espérés</th></tr></thead><tbody>`;
+    res.slice(0,6).forEach((r,i)=>{ h+=`<tr class="${i===0?'you':''}"><td class="mono">${r.pred[0]}-${r.pred[1]}</td>`+
+      `<td class="pts">${(100*r.winP).toFixed(1)}%</td><td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
+    h+=`</tbody></table>`;
+    const evp=bestEV(G).pred;
+    if(evp[0]!==best.pred[0]||evp[1]!==best.pred[1])
+      h+=`<div class="note warn">⚠️ La reco gagnante (${best.pred[0]}-${best.pred[1]}) diffère du prono à points-max (${evp[0]}-${evp[1]}) : être distancé pousse à prendre de la variance pour pouvoir doubler le leader.</div>`;
+    else h+=`<div class="note">Ici, jouer la valeur sûre maximise aussi tes chances de titre.</div>`;
+    $('recoOut').innerHTML=h;
+  },30);
+}
+
+function afterEdit(){ saveLocal(); cloudMaybePush(); renderAll(); }
+function renderAll(){ renderStandings(); renderMatchList(); renderDetail(); renderStyle(); }
+
+function renderStyle(){
+  const {st}=playerStyle();
+  let h='<thead><tr><th class="l">Joueur</th><th>Buts/match prédits</th><th>Style</th><th>Nuls prédits</th><th>Exacts (8)</th></tr></thead><tbody>';
+  PLAYERS.forEach(pl=>{ const s=st[pl]; if(!s.n){ h+=`<tr><td class="l">${pl}</td><td colspan="4" style="color:var(--faint)">inactif</td></tr>`; return; }
+    const lab = s.goalFactor>1.25?'agressif':(s.goalFactor<0.8?'prudent':'équilibré');
+    h+=`<tr class="${pl===ME?'you':''}"><td class="l">${pl}</td><td class="mono">${s.goalAvg.toFixed(2)}</td>`+
+       `<td>${lab} <span class="tag">×${s.goalFactor.toFixed(2)}</span></td><td class="mono">${(100*s.drawRate).toFixed(0)}%</td><td class="mono">${s.exact}</td></tr>`; });
+  h+='</tbody>'; $('styleTbl').innerHTML=h;
+}
+
+/* ======================= PERSISTENCE + SYNC ======================= */
+const LS='castrol_legends_state';
+function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), params:{...P} }; }
+function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
+function applyState(s){
+  if(!s) return;
+  if(s.params){ if(s.params.hostBonus!=null)P.hostBonus=s.params.hostBonus; if(s.params.divGoals!=null)P.divGoals=s.params.divGoals; if(s.params.muTotal!=null)P.muTotal=s.params.muTotal; }
+  if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ m.res=sm.res||null; if(sm.preds)m.preds=sm.preds; } }); }
+}
+function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
+
+// Firebase (espace de noms séparé : rooms/<code>, code dédié pronos)
+const FB={ apiKey:"AIzaSyB6i_Ro1VOl0-Z035Mz78AATOOpGHaScE0", authDomain:"cdm2026-sync.firebaseapp.com",
+  databaseURL:"https://cdm2026-sync-default-rtdb.europe-west1.firebasedatabase.app", projectId:"cdm2026-sync",
+  storageBucket:"cdm2026-sync.firebasestorage.app", messagingSenderId:"284745564853", appId:"1:284745564853:web:41ff61657bad16043934fc" };
+const CODE_KEY='castrol_sync_code';
+let db=null,ref=null,code=null,connected=false,gotInit=false,lastSig=null;
+function sig(o){ return JSON.stringify(o); }
+function setSync(t){ $('syncStatus').textContent=t; }
+function cloudMaybePush(){
+  if(!connected||!gotInit) return;
+  const s=serialize(), sg=sig(s);
+  if(sg===lastSig) return; lastSig=sg;
+  if(ref) ref.set({ data:s, at:new Date().toISOString() }).catch(()=>{});
+}
+function connect(c){
+  if(typeof firebase==='undefined'){ setSync('✗ Firebase non chargé'); return; }
+  code=c; localStorage.setItem(CODE_KEY,c);
+  if(!db){ try{firebase.initializeApp(FB);}catch(e){} db=firebase.database(); }
+  if(ref) ref.off();
+  ref=db.ref('rooms/'+c); connected=true; gotInit=false; setSync('☁️ '+c+' · connexion…');
+  ref.on('value',snap=>{ const v=snap.val();
+    if(!v||!v.data){ const s=serialize(); lastSig=sig(s); if(ref)ref.set({data:s,at:new Date().toISOString()}); gotInit=true; setSync('☁️ '+c+' · prêt'); return; }
+    const sg=sig(v.data); gotInit=true;
+    if(sg===lastSig){ setSync('☁️ '+c+' · à jour'); return; }
+    lastSig=sg; applyState(v.data); renderAll(); setSync('☁️ '+c+' · reçu '+new Date().toLocaleTimeString());
+  }, ()=>{ connected=false; setSync('☁️ accès refusé (règles ?)'); });
+}
+setInterval(cloudMaybePush, 900);
+$('syncBtn').onclick=()=>{ const cur=localStorage.getItem(CODE_KEY)||''; const c=prompt('Code de synchro Castrol (≥ 6 caractères, même code sur tes appareils). Vide = désactiver.', cur);
+  if(c===null) return; const t=c.trim(); if(!t){ if(ref)ref.off(); connected=false; localStorage.removeItem(CODE_KEY); setSync('Sync désactivée'); return; }
+  if(t.length<6){ setSync('✗ code trop court'); return; } connect(t); };
+
+/* ======================= PARAMS UI ======================= */
+$('paramBtn').onclick=()=>{ const b=$('paramBox'); b.style.display=b.style.display==='none'?'block':'none';
+  $('pHost').value=P.hostBonus; $('pDiv').value=P.divGoals; $('pMu').value=P.muTotal; };
+$('pApply').onclick=()=>{ const h=parseFloat($('pHost').value),d=parseFloat($('pDiv').value),u=parseFloat($('pMu').value);
+  if(Number.isFinite(h))P.hostBonus=h; if(Number.isFinite(d))P.divGoals=d; if(Number.isFinite(u))P.muTotal=u; saveLocal(); cloudMaybePush(); renderAll(); };
+
+/* ======================= INIT ======================= */
+loadLocal();
+renderAll();
+const savedCode=localStorage.getItem(CODE_KEY);
+if(savedCode) connect(savedCode); else setSync('Sync désactivée — clique sur ☁️');
+</script>
+</body>
+</html>
