@@ -541,7 +541,8 @@ function winSim(selMatch, candidates, nSims){
 /* ======================= UI ======================= */
 const $=id=>document.getElementById(id);
 let selGroup='ALL', selId=MATCHES.find(m=>!m.res)? MATCHES.find(m=>!m.res).id : 0;
-let lastReco=null;   // {id, html} : la dernière reco calculée, préservée à travers les re-rendus
+let lastReco=null;        // {id, html} : la dernière reco calculée, préservée à travers les re-rendus
+let lastDetailInput=0;    // horodatage de la dernière frappe dans le panneau détail (anti-reconstruction)
 
 function fmtPred(p){ return p? p[0]+'-'+p[1] : '—'; }
 function renderStandings(){
@@ -643,6 +644,7 @@ function wireDetail(m,G){
   const rSave=$('rSave');
   if(rSave) rSave.onclick=()=>{ const a=parseInt($('rA').value,10), b=parseInt($('rB').value,10);
     if(Number.isFinite(a)&&Number.isFinite(b)){ m.res=[a,b]; afterEdit(); } };
+  ['rA','rB'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input', ()=>{ lastDetailInput=Date.now(); }); });
   document.querySelectorAll('.pin').forEach(inp=>{
     const save=()=>{ const pl=inp.dataset.pl;
       const ins=Array.from(document.querySelectorAll(`.pin`)).filter(x=>x.dataset.pl===pl);
@@ -650,9 +652,9 @@ function wireDetail(m,G){
       if(Number.isFinite(a)&&Number.isFinite(b)){ m.preds[pl]=[a,b]; }
       else if(ins[0].value===''&&ins[1].value===''){ m.preds[pl]=null; }
       else { return; }
-      saveLocal();                          // sauvegarde IMMÉDIATE à chaque frappe -> ne se perd plus
+      saveLocal();                          // sauvegarde IMMÉDIATE à chaque frappe
     };
-    inp.addEventListener('input', save);
+    inp.addEventListener('input', ()=>{ lastDetailInput=Date.now(); save(); });
     inp.addEventListener('change', ()=>{ save(); cloudMaybePush();
       renderStyle();                        // le modèle de style apprend en direct (#4)
       const kEl=document.getElementById('knownCount'); if(kEl) kEl.textContent=PLAYERS.filter(p=>m.preds[p]).length+'/'+PLAYERS.length;
@@ -708,12 +710,14 @@ function runWin(m,G){
   },30);
 }
 
-function afterEdit(){ saveLocal(); cloudMaybePush(); renderAll(); }
+function afterEdit(){ lastDetailInput=0; saveLocal(); cloudMaybePush(); renderAll(); }  // save explicite -> on rafraîchit le détail
+function detailBusy(){
+  const ae=document.activeElement, d=document.getElementById('detail');
+  const focusedHere = ae && d && d.contains(ae) && /\bsc\b/.test(ae.className||'');
+  return focusedHere || (Date.now()-lastDetailInput < 4000);   // saisie en cours ou très récente
+}
 function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList();
-  // ne pas reconstruire le panneau détail si tu es en train d'y saisir (préserve champ + curseur)
-  const ae=document.activeElement; const detailEl=document.getElementById('detail');
-  const typing = ae && detailEl && detailEl.contains(ae) && /\bsc\b/.test(ae.className||'');
-  if(!typing) renderDetail();
+  if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
   renderStyle(); renderBonus(); }
 
 const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
