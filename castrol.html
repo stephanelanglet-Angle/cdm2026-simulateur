@@ -329,8 +329,9 @@ function clamp(x,a,b){return x<a?a:(x>b?b:x);}
 function effElo(n){ return (ELO[n]||1700) + (HOSTS.has(n)?P.hostBonus:0); }
 function lambdas(ea,eb){ const s=(ea-eb)/P.divGoals; return [clamp((P.muTotal+s)/2,0.12,6),clamp((P.muTotal-s)/2,0.12,6)]; }
 function poiss(l,n){ const a=[]; let p=Math.exp(-l); for(let k=0;k<=n;k++){a.push(p);p*=l/(k+1);} return a; }
-function grid(home,away){
-  const [la,lb]=lambdas(effElo(home),effElo(away)); const N=14;  // = régie (somme jusqu'à 14 buts) -> probas identiques
+function grid(home,away,N){
+  N = N||14;  // 14 = affichage (= régie) ; 8 = interne simulation (rapide, écart négligeable)
+  const [la,lb]=lambdas(effElo(home),effElo(away));
   const pa=poiss(la,N), pb=poiss(lb,N), g=[];
   let modal=[0,0],mp=-1,pH=0,pD=0,pA=0;
   for(let i=0;i<=N;i++){g.push([]);for(let j=0;j<=N;j++){const q=pa[i]*pb[j];g[i][j]=q;
@@ -414,50 +415,125 @@ function standings(){
   return rows;
 }
 
-/* ======================= SIMULATION POUR GAGNER ======================= */
+/* ======================= SIMULATION POUR GAGNER (poules + élimination directe) ======================= */
 let RNG = (function(){ let a=20260614>>>0; return function(){ a|=0;a=(a+0x6D2B79F5)|0;let t=Math.imul(a^(a>>>15),1|a);t=(t+Math.imul(t^(t>>>7),61|t))^t;return ((t^(t>>>14))>>>0)/4294967296; }; })();
 function sampleScore(G){ const u=RNG(); let c=0; for(let i=0;i<=G.N;i++)for(let j=0;j<=G.N;j++){ c+=G.g[i][j]; if(u<=c) return [i,j]; } return G.modal; }
-
-// meilleur prono EV parmi les scores différents de `avoid` (pour se démarquer du leader)
+// projection rapide d'un prono (EV pré-calculé fourni -> pas de bestEV interne)
+function projectPickFast(s, G, ev){
+  if(!s || !s.active) return null;
+  const f=s.goalFactor; let sa=G.la*f, sb=G.lb*f;
+  if(s.drawRate>0.34 && Math.abs(G.la-G.lb)<0.35){ const m=(sa+sb)/2; sa=m; sb=m; }
+  const w=s.skill;
+  return [Math.max(0,Math.round(w*ev[0]+(1-w)*sa)), Math.max(0,Math.round(w*ev[1]+(1-w)*sb))];
+}
 function bestEVdiff(G, avoid){
   let best=null,be=-1;
   for(let a=0;a<=6;a++)for(let b=0;b<=6;b++){ if(avoid&&a===avoid[0]&&b===avoid[1])continue;
     const e=expPoints([a,b],G); if(e>be){be=e;best=[a,b];} }
   return best||bestEV(G).pred;
 }
+function koWinner(home,away,r){   // résultat 90 min, sinon avantage Elo (prolong./tirs)
+  if(r[0]>r[1]) return home; if(r[1]>r[0]) return away;
+  const We=1/(1+Math.pow(10,-(effElo(home)-effElo(away))/400)); return RNG()<We?home:away;
+}
+/* ----- Bracket officiel (créneaux R32 -> finale) ----- */
+const TS_MATCH=[74,77,79,80,81,82,85,87];
+const TS_ELIG=['ABCDF','CDFGH','CEFHI','EHIJK','BEFIJ','AEHIJ','EFGIJ','DEIJL'];
+const TS_SETS=TS_ELIG.map(e=>new Set(e.split('')));
+const R32=[
+  {n:73,a:['p',2,'A'],b:['p',2,'B']}, {n:74,a:['p',1,'E'],b:['t',0]},
+  {n:75,a:['p',1,'F'],b:['p',2,'C']}, {n:76,a:['p',1,'C'],b:['p',2,'F']},
+  {n:77,a:['p',1,'I'],b:['t',1]},     {n:78,a:['p',2,'E'],b:['p',2,'I']},
+  {n:79,a:['p',1,'A'],b:['t',2]},     {n:80,a:['p',1,'L'],b:['t',3]},
+  {n:81,a:['p',1,'D'],b:['t',4]},     {n:82,a:['p',1,'G'],b:['t',5]},
+  {n:83,a:['p',2,'K'],b:['p',2,'L']}, {n:84,a:['p',1,'H'],b:['p',2,'J']},
+  {n:85,a:['p',1,'B'],b:['t',6]},     {n:86,a:['p',1,'J'],b:['p',2,'H']},
+  {n:87,a:['p',1,'K'],b:['t',7]},     {n:88,a:['p',2,'D'],b:['p',2,'G']},
+];
+const R16=[[74,77],[73,75],[76,78],[79,80],[83,84],[81,82],[86,88],[85,87]]; // ->89..96
+const QF=[[89,90],[93,94],[91,92],[95,96]]; // ->97..100
+const SF=[[97,98],[99,100]];                // ->101,102
+function assignThirds(groups){   // couplage de Kuhn : 8 groupes (meilleurs 3es) -> 8 créneaux
+  const assign=new Array(8).fill(null), gpos=new Array(8).fill(-1);
+  function tryA(slot,seen){ for(let k=0;k<8;k++){ const g=groups[k];
+    if(TS_SETS[slot].has(g)&&!seen[k]){ seen[k]=true;
+      if(gpos[k]===-1||tryA(gpos[k],seen)){ gpos[k]=slot; assign[slot]=g; return true; } } } return false; }
+  for(let s=0;s<8;s++){ if(!tryA(s,new Array(8).fill(false))){ const used=new Set(assign.filter(Boolean));
+    for(const g of groups){ if(!used.has(g)&&TS_SETS[s].has(g)){ assign[s]=g; break; } } } }
+  return assign;
+}
+
 function winSim(selMatch, candidates, nSims){
   const style=playerStyle();
-  const base=standings(); const cur={}; base.forEach(r=>cur[r.p]=r.pts);
-  const leader = base[0].p;                 // rival principal à doubler
-  const iLead  = (leader===ME);             // suis-je en tête ?
-  const remaining = MATCHES.filter(m=>!m.res);
-  // pré-calcul par match restant : grille ; prono futur du joueur (politique "pour gagner") ; pronos adversaires
-  const info = remaining.map(m=>{
-    const G=grid(m.home,m.away);
-    const opp={}; PLAYERS.forEach(pl=>{ if(pl!==ME) opp[pl]=projectPick(pl,G,style); });
-    // politique du "moi futur" : en tête -> valeur sûre (EV) ; distancé -> me démarquer du leader
-    const lp = iLead ? null : projectPick(leader,G,style);
-    const meFut = iLead ? bestEV(G).pred : bestEVdiff(G, lp);
-    return {m,G,meFut,opp};
+  const leader=standings()[0].p, iLead=(leader===ME);
+  const others=PLAYERS.filter(p=>p!==ME);
+  const GL=Object.keys(GROUPS);
+  // bonus déjà résolus (saisis) -> priment sur la simulation
+  const fixedSemis=(BONUS_ACTUAL.semis||[]).filter(Boolean).length===4 ? BONUS_ACTUAL.semis : null;
+  const fixedChamp=BONUS_ACTUAL.champ||null;
+  // pré-calcul des matchs de poule (grille N=8 = rapide)
+  const gmInfo=MATCHES.map(m=>{ const G=grid(m.home,m.away,8); const ev=bestEV(G).pred;
+    const lp=iLead?null:projectPickFast(style.st[leader],G,ev);
+    const meFut=iLead?ev:bestEVdiff(G,lp);
+    const oppFut={}; others.forEach(pl=>oppFut[pl]=projectPickFast(style.st[pl],G,ev));
+    return {m,G,meFut,oppFut};
   });
-  const others = PLAYERS.filter(p=>p!==ME);
-  const wins = candidates.map(()=>0), podium = candidates.map(()=>0);
+  // cache amorti par affrontement KO
+  const koCache={};
+  function koInfo(h,a){ const k=h+'|'+a; let ki=koCache[k]; if(ki) return ki;
+    const G=grid(h,a,8); const ev=bestEV(G).pred;
+    const lp=iLead?null:projectPickFast(style.st[leader],G,ev);
+    const meFut=iLead?ev:bestEVdiff(G,lp);
+    const opp={}; others.forEach(pl=>opp[pl]=projectPickFast(style.st[pl],G,ev));
+    return koCache[k]={G,meFut,opp};
+  }
+  const wins=candidates.map(()=>0), podium=candidates.map(()=>0);
   for(let s=0;s<nSims;s++){
     const add={}; PLAYERS.forEach(p=>add[p]=0);
-    let selResult=null;
-    info.forEach(it=>{
-      const r=sampleScore(it.G);
-      if(it.m.id===selMatch.id){ selResult=r; }
-      others.forEach(pl=>{ const pk=it.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
-      if(it.m.id!==selMatch.id){ add[ME]+=pts(it.meFut[0],it.meFut[1],r[0],r[1]); }
+    let selResult=null; const groupRes={};
+    // 1) matchs de poule
+    gmInfo.forEach(it=>{ const m=it.m; const r=m.res?m.res:sampleScore(it.G); groupRes[m.n]=r;
+      if(m.id===selMatch.id) selResult=r;
+      others.forEach(pl=>{ const pk=m.res?(m.preds[pl]||null):it.oppFut[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
+      if(m.id!==selMatch.id){ const my=m.res?(m.preds[ME]||null):it.meFut; if(my) add[ME]+=pts(my[0],my[1],r[0],r[1]); }
     });
-    const oTot = others.map(p=>cur[p]+add[p]).sort((a,b)=>b-a);
-    const myBase = cur[ME]+add[ME];
-    candidates.forEach((c,ci)=>{
-      const mine = myBase + (selResult? pts(c[0],c[1],selResult[0],selResult[1]) : 0);
-      if(mine>=oTot[0]) wins[ci]++;          // 1er (égalités comprises)
-      if(mine>=oTot[2]) podium[ci]++;        // top 3
+    // 2) classements de poule
+    const SB={};
+    GL.forEach(g=>{ const t={}; GROUPS[g].forEach(tm=>t[tm]={team:tm,pts:0,gf:0,ga:0});
+      MATCHES.filter(m=>m.g===g).forEach(m=>{ const r=groupRes[m.n], a=r[0], b=r[1];
+        t[m.home].gf+=a;t[m.home].ga+=b;t[m.away].gf+=b;t[m.away].ga+=a;
+        if(a>b)t[m.home].pts+=3;else if(b>a)t[m.away].pts+=3;else{t[m.home].pts++;t[m.away].pts++;} });
+      SB[g]=Object.values(t).sort((x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||(RNG()-.5));
     });
+    // 3) 8 meilleurs 3es -> créneaux
+    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||(RNG()-.5)).slice(0,8).map(x=>x.g);
+    const tA=assignThirds(best8);
+    const thirdTeam={}; TS_MATCH.forEach((mn,si)=>{ const g=tA[si]||best8[si]; thirdTeam[mn]=SB[g][2].team; });
+    // 4) phase finale
+    const W={};
+    const slotTeam=(slot,mn)=> slot[0]==='p' ? SB[slot[2]][slot[1]-1].team : thirdTeam[mn];
+    R32.forEach(mt=>{ const h=slotTeam(mt.a,mt.n), a=slotTeam(mt.b,mt.n); const ki=koInfo(h,a); const r=sampleScore(ki.G);
+      others.forEach(pl=>{ const pk=ki.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
+      add[ME]+=pts(ki.meFut[0],ki.meFut[1],r[0],r[1]); W[mt.n]=koWinner(h,a,r); });
+    const playKO=(pairs,start)=>pairs.forEach((pr,i)=>{ const mn=start+i, h=W[pr[0]], a=W[pr[1]]; const ki=koInfo(h,a); const r=sampleScore(ki.G);
+      others.forEach(pl=>{ const pk=ki.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
+      add[ME]+=pts(ki.meFut[0],ki.meFut[1],r[0],r[1]); W[mn]=koWinner(h,a,r); });
+    playKO(R16,89); playKO(QF,97); playKO(SF,101);
+    { const h=W[101], a=W[102]; const ki=koInfo(h,a); const r=sampleScore(ki.G);
+      others.forEach(pl=>{ const pk=ki.opp[pl]; if(pk) add[pl]+=pts(pk[0],pk[1],r[0],r[1]); });
+      add[ME]+=pts(ki.meFut[0],ki.meFut[1],r[0],r[1]); W[104]=koWinner(h,a,r); }
+    const semis=fixedSemis||[W[97],W[98],W[99],W[100]];
+    const champion=fixedChamp||W[104];
+    // 5) bonus (4 pts) résolus
+    PLAYERS.forEach(pl=>{ const bp=BONUS_PICKS[pl]; if(!bp) return;
+      GL.forEach(g=>{ if(bp.gw && bp.gw[g]===SB[g][0].team) add[pl]+=BONUS_PT; });
+      semis.forEach(tm=>{ if(bp.df && bp.df.includes(tm)) add[pl]+=BONUS_PT; });
+      if(bp.champ===champion) add[pl]+=BONUS_PT;
+    });
+    // 6) classement
+    const oTot=others.map(p=>add[p]).sort((a,b)=>b-a); const myBase=add[ME];
+    candidates.forEach((c,ci)=>{ const mine=myBase+(selResult?pts(c[0],c[1],selResult[0],selResult[1]):0);
+      if(mine>=oTot[0])wins[ci]++; if(mine>=oTot[2])podium[ci]++; });
   }
   return candidates.map((c,ci)=>({pred:c, winP:wins[ci]/nSims, podP:podium[ci]/nSims}));
 }
@@ -589,7 +665,7 @@ function runWin(m,G){
     const push=k=>{ const s=k[0]+'-'+k[1]; if(!seen.has(s)){seen.add(s);cand.push(k);} };
     push(bestEV(G).pred);
     cells.slice(0,7).forEach(c=>push(c.k));
-    const res=winSim(m,cand,4000).sort((a,b)=>(b.winP-a.winP)||(b.podP-a.podP)||(expPoints(b.pred,G)-expPoints(a.pred,G)));
+    const res=winSim(m,cand,2500).sort((a,b)=>(b.winP-a.winP)||(b.podP-a.podP)||(expPoints(b.pred,G)-expPoints(a.pred,G)));
     const best=res[0];
     let h=`<div class="big">${best.pred[0]} – ${best.pred[1]}</div>`+
       `<div class="note">Meilleure probabilité de finir 1ᵉʳ : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b> · podium ${(100*best.podP).toFixed(0)}%</div>`;
@@ -620,7 +696,7 @@ function runWin(m,G){
     why+=`<li>Bilan simulé : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b> de finir 1ᵉʳ, ${(100*best.podP).toFixed(0)}% de podium — la meilleure de tes options sur ${res.length} testées.</li>`;
     why+=`</ul></div>`;
     h+=why;
-    h+=`<div class="note">Adversaires simulés selon leur <b>précision mesurée</b>. ⚠️ La phase finale et les bonus ne sont pas encore dans cette projection (en cours d'intégration). Relance à chaque journée.</div>`;
+    h+=`<div class="note">Projection complète : <b>poules + élimination directe + bonus</b> simulés ${2500} fois. Adversaires joués selon leur précision mesurée. Relance à chaque journée pour intégrer les nouveaux résultats.</div>`;
     $('recoOut').innerHTML=h;
   },30);
 }
