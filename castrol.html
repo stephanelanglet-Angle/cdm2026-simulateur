@@ -85,13 +85,9 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
     <button class="btn" id="paramBtn">⚙️ Paramètres modèle</button>
   </div>
   <div id="paramBox" class="card" style="display:none">
-    <h2>Paramètres du modèle <small>partagés avec ton simulateur principal si présents</small></h2>
-    <div class="bar">
-      <label>Bonus hôte <input class="sc" id="pHost" style="width:60px"></label>
-      <label>Diviseur buts <input class="sc" id="pDiv" style="width:60px"></label>
-      <label>Buts/match <input class="sc" id="pMu" style="width:60px"></label>
-      <button class="btn primary" id="pApply">Appliquer</button>
-    </div>
+    <h2>Paramètres du modèle <small>source unique = simulateur principal → probas 1N2 identiques</small></h2>
+    <div class="bar" id="paramShow"></div>
+    <div class="note">Pour les modifier, utilise les curseurs ⚙️ du <a href="index.html">simulateur principal</a>. Castrol les relit automatiquement (au retour sur l'onglet).</div>
   </div>
 </header>
 
@@ -179,12 +175,15 @@ const PRED0 = {
 };
 
 /* ======================= ÉTAT ======================= */
+// Paramètres du modèle : SOURCE UNIQUE = le simulateur principal (localStorage partagé,
+// même origine). Garantit des probas 1N2 strictement identiques entre les deux pages.
 const P = { hostBonus:60, divGoals:300, muTotal:2.70 };
-(function loadParams(){
+function syncParamsFromMain(){
   try{ const d=JSON.parse(localStorage.getItem('cdm2026_simulateur_state')||'{}');
     if(d.state&&d.state.params){ const q=d.state.params;
-      if(q.hostBonus!=null)P.hostBonus=q.hostBonus; if(q.divGoals!=null)P.divGoals=q.divGoals; if(q.muTotal!=null)P.muTotal=q.muTotal; } }catch(e){}
-})();
+      if(q.hostBonus!=null)P.hostBonus=+q.hostBonus; if(q.divGoals!=null)P.divGoals=+q.divGoals; if(q.muTotal!=null)P.muTotal=+q.muTotal; } }catch(e){}
+}
+syncParamsFromMain();
 
 let MATCHES = [];   // {id,g,home,away,res|null,preds:{player:[a,b]|null}}
 function buildMatches(){
@@ -490,7 +489,7 @@ function runWin(m,G){
 }
 
 function afterEdit(){ saveLocal(); cloudMaybePush(); renderAll(); }
-function renderAll(){ renderStandings(); renderMatchList(); renderDetail(); renderStyle(); }
+function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList(); renderDetail(); renderStyle(); }
 
 function renderStyle(){
   const {st}=playerStyle();
@@ -516,11 +515,11 @@ function renderStyle(){
 
 /* ======================= PERSISTENCE + SYNC ======================= */
 const LS='castrol_legends_state';
-function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), params:{...P} }; }
+// NB : on NE persiste PAS les paramètres du modèle ici (source unique = simulateur principal)
+function serialize(){ return { matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})) }; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
 function applyState(s){
   if(!s) return;
-  if(s.params){ if(s.params.hostBonus!=null)P.hostBonus=s.params.hostBonus; if(s.params.divGoals!=null)P.divGoals=s.params.divGoals; if(s.params.muTotal!=null)P.muTotal=s.params.muTotal; }
   if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ m.res=sm.res||null; if(sm.preds)m.preds=sm.preds; } }); }
 }
 function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
@@ -559,9 +558,11 @@ $('syncBtn').onclick=()=>{ const cur=localStorage.getItem(CODE_KEY)||''; const c
 
 /* ======================= PARAMS UI ======================= */
 $('paramBtn').onclick=()=>{ const b=$('paramBox'); b.style.display=b.style.display==='none'?'block':'none';
-  $('pHost').value=P.hostBonus; $('pDiv').value=P.divGoals; $('pMu').value=P.muTotal; };
-$('pApply').onclick=()=>{ const h=parseFloat($('pHost').value),d=parseFloat($('pDiv').value),u=parseFloat($('pMu').value);
-  if(Number.isFinite(h))P.hostBonus=h; if(Number.isFinite(d))P.divGoals=d; if(Number.isFinite(u))P.muTotal=u; saveLocal(); cloudMaybePush(); renderAll(); };
+  syncParamsFromMain();
+  $('paramShow').innerHTML=`<span class="tag">Bonus hôte +${P.hostBonus} Elo</span> <span class="tag">Diviseur ${P.divGoals} Elo/but</span> <span class="tag">${P.muTotal.toFixed(2)} buts/match</span>`; };
+// relire les paramètres calibrés quand on revient sur l'onglet (depuis la régie)
+window.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ syncParamsFromMain(); renderAll(); } });
+window.addEventListener('focus', ()=>{ syncParamsFromMain(); renderAll(); });
 
 /* ======================= INIT ======================= */
 loadLocal();
