@@ -195,6 +195,8 @@ footer{margin-top:26px;color:var(--faint);font-size:11.5px;line-height:1.6;borde
     <button class="ioBtn" id="exportBtn">📤 Exporter l'état</button>
     <button class="ioBtn" id="importBtn">📥 Importer l'état</button>
     <input type="file" id="importFile" accept=".json">
+    <button class="ioBtn" id="syncBtn">☁️ Synchroniser (iPhone / PC)</button>
+    <span id="syncStatus" style="font-size:12.5px;color:var(--muted);align-self:center"></span>
   </div>
 </section>
 
@@ -231,6 +233,10 @@ footer{margin-top:26px;color:var(--faint);font-size:11.5px;line-height:1.6;borde
 <footer id="foot"></footer>
 <div id="toast"></div>
 </div>
+
+<!-- Firebase (synchronisation cloud iPhone/PC) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
 <script>
 'use strict';
@@ -491,7 +497,7 @@ const DAY_DATES = {1:'11–17 juin',2:'18–23 juin',3:'24–27 juin'};
 const SPECIAL = { 'A-0-1':'Ouverture · 11 juin', 'I-0-1':'16 juin', 'I-0-2':'22 juin', 'I-3-0':'26 juin' };
 
 function showToast(msg, duration = 2500) {
-  const toast = $('#toast');
+  const toast = $('toast');
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(() => toast.classList.remove('show'), duration);
@@ -552,16 +558,16 @@ function importState(data) {
     state.params.hostBonus = s.params.hostBonus !== undefined ? s.params.hostBonus : 60;
     state.params.divGoals = s.params.divGoals !== undefined ? s.params.divGoals : 300;
     state.params.muTotal = s.params.muTotal !== undefined ? s.params.muTotal : 2.70;
-    $('#pHost').value = state.params.hostBonus;
-    $('#pDiv').value = state.params.divGoals;
-    $('#pMu').value = state.params.muTotal;
-    $('#vHost').textContent = '+'+state.params.hostBonus+' Elo';
-    $('#vDiv').textContent = ''+state.params.divGoals;
-    $('#vMu').textContent = state.params.muTotal.toFixed(2).replace('.',',');
+    $('pHost').value = state.params.hostBonus;
+    $('pDiv').value = state.params.divGoals;
+    $('pMu').value = state.params.muTotal;
+    $('vHost').textContent = '+'+state.params.hostBonus+' Elo';
+    $('vDiv').textContent = ''+state.params.divGoals;
+    $('vMu').textContent = state.params.muTotal.toFixed(2).replace('.',',');
   }
   if (s.nSims) {
     state.nSims = s.nSims;
-    const simsSelect = $('#pSims');
+    const simsSelect = $('pSims');
     for (let opt of simsSelect.options) {
       if (+opt.value === state.nSims) { opt.selected = true; break; }
     }
@@ -673,7 +679,7 @@ async function run(){
 function renderGroupSel(){
   $('groupSel').innerHTML = GROUP_LETTERS.map(L => {
     const top = GIDX[L].map(i=>TEAMS[i]).reduce((a,b)=>a.elo>b.elo?a:b);
-    return '<button class="gchip" data-g="'+L+'" aria-pressed="'+(L===state.selGroup)+'">'+'
+    return '<button class="gchip" data-g="'+L+'" aria-pressed="'+(L===state.selGroup)+'">'+
       '<span class="gl">'+L+'</span><span class="gf">'+top.flag+'</span></button>';
   }).join('');
   $('groupSel').querySelectorAll('.gchip').forEach(b => b.onclick = () => {
@@ -692,12 +698,12 @@ function renderMatches(){
     const key = L+'-'+PAIRS[pi][0]+'-'+PAIRS[pi][1];
     const cons = state.constraints.get(key);
     const sp = SPECIAL[key];
-    html += '<button class="ticket'+(pi===state.selPair?' sel':'')+'" data-pi="'+pi+'">'+'
-      '(cons ? '<span class="lock">verrouillé · '+(cons==='A'?'1':cons==='D'?'N':'2')+'</span>' : '')+
-      '<div class="row"><span class="tn">'+a.flag+' '+a.name+(sp?'<span class="badge">'+sp+'</span>':'')+'</span>'+'
-      '<span class="pct"><b class="pA">'+fmt0(100*m.pA)+'</b> · <b class="pN">'+fmt0(100*m.pN)+'</b> · <b class="pB">'+fmt0(100*m.pB)+'</b> %</span></div>'+'
-      '<div class="row" style="margin-top:2px"><span class="tn" style="font-size:14px;color:var(--muted)">'+b.flag+' '+b.name+'</span></div>'+'
-      '<div class="tribar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+'
+    html += '<button class="ticket'+(pi===state.selPair?' sel':'')+'" data-pi="'+pi+'">'+
+      (cons ? '<span class="lock">verrouillé · '+(cons==='A'?'1':cons==='D'?'N':'2')+'</span>' : '')+
+      '<div class="row"><span class="tn">'+a.flag+' '+a.name+(sp?'<span class="badge">'+sp+'</span>':'')+'</span>'+
+      '<span class="pct"><b class="pA">'+fmt0(100*m.pA)+'</b> · <b class="pN">'+fmt0(100*m.pN)+'</b> · <b class="pB">'+fmt0(100*m.pB)+'</b> %</span></div>'+
+      '<div class="row" style="margin-top:2px"><span class="tn" style="font-size:14px;color:var(--muted)">'+b.flag+' '+b.name+'</span></div>'+
+      '<div class="tribar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+
     '</button>';
   }
   $('matchList').innerHTML = html;
@@ -733,32 +739,32 @@ function renderDetail(){
     }
   }
   $('detail').innerHTML =
-    '<div class="ctx">Groupe '+L+' · Journée '+PAIR_DAY[pi]+(sp?' · '+sp:' · '+DAY_DATES[PAIR_DAY[pi]])+'</div>'+'
-    '<div class="vs">'+'
-      '<div class="side"><div class="nm"><span class="fl">'+a.flag+'</span> '+a.name+'</div><div class="elo">Elo '+a.elo+(a.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+'
-      '<div class="x">VS</div>'+'
-      '<div class="side r"><div class="nm">'+b.name+' <span class="fl">'+b.flag+'</span></div><div class="elo">Elo '+b.elo+(b.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+'
-    '</div>'+'
-    '<div class="big3">'+'
-      '<div class="b"><div class="v pA">'+fmt1(100*m.pA)+' %</div><div class="l">1 · '+a.name+'</div></div>'+'
-      '<div class="b"><div class="v pN">'+fmt1(100*m.pN)+' %</div><div class="l">N · Nul</div></div>'+'
-      '<div class="b"><div class="v pB">'+fmt1(100*m.pB)+' %</div><div class="l">2 · '+b.name+'</div></div>'+'
-    '</div>'+'
-    '<div class="tribar bigbar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+'
-    '<div class="facts">'+'
-      '<span>Score le plus probable <b>'+m.best[0]+' – '+m.best[1]+'</b> ('+fmt1(100*m.bestP)+' %)</span>'+'
-      '<span>Buts attendus <b>'+m.la.toFixed(2).replace('.',',')+'</b> / <b>'+m.lb.toFixed(2).replace('.',',')+'</b></span>'+'
-    '</div>'+'
-    '<div class="hmwrap"><div class="hmcap"><span>Distribution des scores (%) — lignes : '+a.name+' · colonnes : '+b.name+'</span></div><div class="hm">'+hm+'</div></div>'+'
-    '<div class="forceRow">'+'
-      '<div class="ft">Verrouiller le résultat :</div>'+'
-      '<div class="chips">'+'
-        '<button class="chip'+(cons==='A'?' on':'')+'" data-o="A">1 · '+a.name+'</button>'+'
-        '<button class="chip'+(cons==='D'?' on':'')+'" data-o="D">N · Nul</button>'+'
-        '<button class="chip'+(cons==='B'?' on':'')+'" data-o="B">2 · '+b.name+'</button>'+'
-        '<button class="chip free'+(!cons?' on':'')+'" data-o="">Libre</button>'+'
-      '</div>'+'
-      '<div class="forceNote">Le verrou impose le résultat à chaque tournoi simulé.</div>'+'
+    '<div class="ctx">Groupe '+L+' · Journée '+PAIR_DAY[pi]+(sp?' · '+sp:' · '+DAY_DATES[PAIR_DAY[pi]])+'</div>'+
+    '<div class="vs">'+
+      '<div class="side"><div class="nm"><span class="fl">'+a.flag+'</span> '+a.name+'</div><div class="elo">Elo '+a.elo+(a.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+
+      '<div class="x">VS</div>'+
+      '<div class="side r"><div class="nm">'+b.name+' <span class="fl">'+b.flag+'</span></div><div class="elo">Elo '+b.elo+(b.host?' <span style="color:var(--gold)">+'+state.params.hostBonus+' hôte</span>':'')+'</div></div>'+
+    '</div>'+
+    '<div class="big3">'+
+      '<div class="b"><div class="v pA">'+fmt1(100*m.pA)+' %</div><div class="l">1 · '+a.name+'</div></div>'+
+      '<div class="b"><div class="v pN">'+fmt1(100*m.pN)+' %</div><div class="l">N · Nul</div></div>'+
+      '<div class="b"><div class="v pB">'+fmt1(100*m.pB)+' %</div><div class="l">2 · '+b.name+'</div></div>'+
+    '</div>'+
+    '<div class="tribar bigbar"><span style="width:'+(100*m.pA)+'%"></span><span style="width:'+(100*m.pN)+'%"></span><span style="width:'+(100*m.pB)+'%"></span></div>'+
+    '<div class="facts">'+
+      '<span>Score le plus probable <b>'+m.best[0]+' – '+m.best[1]+'</b> ('+fmt1(100*m.bestP)+' %)</span>'+
+      '<span>Buts attendus <b>'+m.la.toFixed(2).replace('.',',')+'</b> / <b>'+m.lb.toFixed(2).replace('.',',')+'</b></span>'+
+    '</div>'+
+    '<div class="hmwrap"><div class="hmcap"><span>Distribution des scores (%) — lignes : '+a.name+' · colonnes : '+b.name+'</span></div><div class="hm">'+hm+'</div></div>'+
+    '<div class="forceRow">'+
+      '<div class="ft">Verrouiller le résultat :</div>'+
+      '<div class="chips">'+
+        '<button class="chip'+(cons==='A'?' on':'')+'" data-o="A">1 · '+a.name+'</button>'+
+        '<button class="chip'+(cons==='D'?' on':'')+'" data-o="D">N · Nul</button>'+
+        '<button class="chip'+(cons==='B'?' on':'')+'" data-o="B">2 · '+b.name+'</button>'+
+        '<button class="chip free'+(!cons?' on':'')+'" data-o="">Libre</button>'+
+      '</div>'+
+      '<div class="forceNote">Le verrou impose le résultat à chaque tournoi simulé.</div>'+
     '</div>';
   $('detail').querySelectorAll('.chip').forEach(c => c.onclick = () => {
     const o = c.dataset.o;
@@ -784,11 +790,11 @@ function renderTable(){
   $('tbody').innerHTML = shown.map(r => {
     const dCls = r.d > .05 ? 'dpos' : r.d < -.05 ? 'dneg' : 'dzero';
     const dTxt = r.d > .05 ? '▲ '+fmt1(r.d) : r.d < -.05 ? '▼ '+fmt1(-r.d) : '·';
-    return '<tr>'+'
-      '<td class="team"><span class="fl">'+r.t.flag+'</span>'+r.t.name+'<span class="gp">'+r.t.group+'</span></td>'+'
-      '<td><span class="tbar" style="width:'+(54*r.c/maxC).toFixed(0)+'px"></span>'+fmt1(r.c)+'</td>'+'
-      '(state.constraints.size>0?'<td class="'+dCls+'">'+dTxt+'</td>':'')+'
-      '<td>'+fmt1(r.f)+'</td><td>'+fmt1(r.s)+'</td><td>'+fmt1(r.q)+'</td>'+'
+    return '<tr>'+
+      '<td class="team"><span class="fl">'+r.t.flag+'</span>'+r.t.name+'<span class="gp">'+r.t.group+'</span></td>'+
+      '<td><span class="tbar" style="width:'+(54*r.c/maxC).toFixed(0)+'px"></span>'+fmt1(r.c)+'</td>'+
+      (state.constraints.size>0?'<td class="'+dCls+'">'+dTxt+'</td>':'')+
+      '<td>'+fmt1(r.f)+'</td><td>'+fmt1(r.s)+'</td><td>'+fmt1(r.q)+'</td>'+
     '</tr>';
   }).join('');
   $('moreBtn').textContent = state.showAll ? 'Réduire' : 'Afficher les 48 équipes';
@@ -843,7 +849,7 @@ $('moreBtn').onclick = () => {
 };
 
 $('exportBtn').onclick = exportState;
-$('importBtn').onclick = () => $('#importFile').click();
+$('importBtn').onclick = () => $('importFile').click();
 $('importFile').addEventListener('change', importStateFromFile);
 
 const loadedFromStorage = loadFromLocalStorage();
@@ -863,6 +869,154 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 
 window.addEventListener('pagehide', saveToLocalStorage);
 window.addEventListener('beforeunload', saveToLocalStorage);
+
+/* ============================================================================
+   SYNCHRONISATION CLOUD (Firebase Realtime Database)
+   Couche additive : observe la mémoire locale et la synchronise entre appareils
+   via un « code de synchro » partagé. N'altère aucune fonction existante.
+   ========================================================================== */
+(function(){
+  const firebaseConfig = {
+    apiKey: "AIzaSyB6i_Ro1VOl0-Z035Mz78AATOOpGHaScE0",
+    authDomain: "cdm2026-sync.firebaseapp.com",
+    databaseURL: "https://cdm2026-sync-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "cdm2026-sync",
+    storageBucket: "cdm2026-sync.firebasestorage.app",
+    messagingSenderId: "284745564853",
+    appId: "1:284745564853:web:41ff61657bad16043934fc"
+  };
+
+  const CODE_KEY = 'cdm2026_sync_code';
+  const LS_KEY   = 'cdm2026_simulateur_state';
+  let db = null, roomRef = null, syncCode = null;
+  let lastCloudSig = null;      // signature de l'état échangé en dernier avec le cloud
+  let applyingRemote = false;   // vrai pendant l'application d'un état distant
+  let connected = false;
+  let gotInitial = false;       // vrai dès que le 1er instantané cloud est reçu (anti-écrasement)
+
+  function fbReady(){ return typeof firebase !== 'undefined' && firebase && firebase.database; }
+  function setStatus(txt){ const el = document.getElementById('syncStatus'); if (el) el.textContent = txt; }
+  function nowT(){ try { return new Date().toLocaleTimeString(); } catch(e){ return ''; } }
+
+  // JSON stable (clés triées) de la partie partagée : verrous + paramètres
+  function stableSig(obj){
+    function norm(v){
+      if (v && typeof v === 'object' && !Array.isArray(v)){
+        const o = {}; Object.keys(v).sort().forEach(k => { o[k] = norm(v[k]); }); return o;
+      }
+      return v;
+    }
+    return JSON.stringify(norm(obj));
+  }
+
+  // Lit l'état partagé directement depuis la mémoire (pas de latence localStorage)
+  function sharedFromState(){
+    try {
+      if (typeof state === 'undefined' || !state) return null;
+      return {
+        params: { hostBonus: state.params.hostBonus, divGoals: state.params.divGoals, muTotal: state.params.muTotal },
+        nSims: state.nSims || null,
+        constraints: Object.fromEntries(state.constraints)
+      };
+    } catch(e){ return null; }
+  }
+
+  function applyRemote(shared){
+    applyingRemote = true;
+    try {
+      // importState ne modifie pas la sélection locale (selGroup/selPair/showAll absents)
+      importState({ version: 1, state: {
+        params: shared.params, nSims: shared.nSims, constraints: shared.constraints || {}
+      }});
+    } catch(e){ console.warn('Sync applyRemote:', e); }
+    applyingRemote = false;
+  }
+
+  function pushLocal(shared){
+    if (!roomRef) return;
+    roomRef.set({
+      params: shared.params || {},
+      nSims: shared.nSims || null,
+      constraints: shared.constraints || {},
+      savedAt: nowT(), savedAtISO: (function(){ try { return new Date().toISOString(); } catch(e){ return ''; } })()
+    }).catch(e => { console.warn('Sync push:', e); setStatus('☁️ ' + syncCode + ' · erreur envoi'); });
+  }
+
+  function connect(code){
+    if (!fbReady()){ if (typeof showToast === 'function') showToast('✗ Firebase non chargé'); return; }
+    syncCode = code;
+    localStorage.setItem(CODE_KEY, code);
+    if (!db){ try { firebase.initializeApp(firebaseConfig); } catch(e){} db = firebase.database(); }
+    if (roomRef) roomRef.off();
+    roomRef = db.ref('rooms/' + code);
+    connected = true;
+    gotInitial = false;
+    setStatus('☁️ ' + code + ' · connexion…');
+    roomRef.on('value', function(snap){
+      const val = snap.val();
+      if (!val){                                   // pièce vide -> on l'amorce avec l'état local
+        const loc = sharedFromState();
+        if (loc){ lastCloudSig = stableSig(loc); pushLocal(loc); }
+        gotInitial = true;
+        setStatus('☁️ ' + code + ' · prêt (en attente d\'un autre appareil)');
+        return;
+      }
+      const shared = { params: val.params || {}, nSims: val.nSims || null, constraints: val.constraints || {} };
+      const sig = stableSig(shared);
+      gotInitial = true;
+      if (sig === lastCloudSig){ setStatus('☁️ ' + code + ' · à jour'); return; }  // notre propre écho
+      lastCloudSig = sig;
+      applyRemote(shared);
+      setStatus('☁️ ' + code + ' · résultats reçus ' + nowT());
+    }, function(err){
+      connected = false;
+      setStatus('☁️ erreur : ' + (err && err.code ? err.code : 'accès refusé'));
+      if (typeof showToast === 'function') showToast('✗ Sync refusée (règles ?)');
+    });
+  }
+
+  function disconnect(){
+    if (roomRef) roomRef.off();
+    roomRef = null; connected = false; syncCode = null; gotInitial = false;
+    localStorage.removeItem(CODE_KEY);
+    setStatus('Sync désactivée');
+  }
+
+  // Détection des changements locaux (découplée du reste du code) -> envoi au cloud.
+  // gotInitial empêche d'écraser le cloud avant d'avoir reçu son 1er instantané.
+  setInterval(function(){
+    if (!connected || applyingRemote || !gotInitial) return;
+    const loc = sharedFromState();
+    if (!loc) return;
+    const sig = stableSig(loc);
+    if (sig === lastCloudSig) return;            // rien de neuf / déjà synchronisé
+    lastCloudSig = sig;
+    pushLocal(loc);
+    setStatus('☁️ ' + syncCode + ' · résultats envoyés ' + nowT());
+  }, 800);
+
+  function promptCode(){
+    const cur = localStorage.getItem(CODE_KEY) || '';
+    const code = window.prompt(
+      'Code de synchro — le MÊME sur tous tes appareils (iPhone et PC).\n\n' +
+      'Choisis un code privé difficile à deviner (≥ 6 caractères),\n' +
+      'par ex. : langlet-cdm26-7x\n\n' +
+      '(Laisse vide puis OK pour désactiver la synchro.)', cur);
+    if (code === null) return;                   // annulé
+    const c = code.trim();
+    if (!c){ disconnect(); if (typeof showToast === 'function') showToast('Sync désactivée'); return; }
+    if (c.length < 6){ if (typeof showToast === 'function') showToast('✗ Code trop court (≥ 6)'); return; }
+    connect(c);
+    if (typeof showToast === 'function') showToast('✓ Sync activée : ' + c);
+  }
+
+  const btn = document.getElementById('syncBtn');
+  if (btn) btn.onclick = promptCode;
+
+  // Reconnexion automatique si un code est déjà mémorisé sur cet appareil
+  const saved = localStorage.getItem(CODE_KEY);
+  if (saved){ connect(saved); } else { setStatus('Sync désactivée — clique sur ☁️'); }
+})();
 </script>
 </body>
 </html>

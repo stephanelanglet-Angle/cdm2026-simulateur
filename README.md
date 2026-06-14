@@ -64,6 +64,20 @@ et écrit le fichier `cdm2026_probabilities.csv` (8 indicateurs pour les 48 équ
 > la même moitié de tableau. Espagne et France ne pourraient donc se croiser qu'en
 > demi-finale — ce qui pénalise la France dans le modèle par rapport à sa cote de marché.
 
+## Application web interactive (`index.html`)
+
+En plus du script Python, le dépôt contient une **web-app** qui rejoue la même
+simulation Monte Carlo directement dans le navigateur (paramètres ajustables,
+contraintes de résultats, comparaison au marché). Elle est publiée via GitHub Pages :
+
+👉 **https://stephanelanglet-angle.github.io/cdm2026-simulateur/**
+
+**Saisie des résultats réels.** Pour chaque match de poule, on peut « verrouiller »
+le résultat (1 / N / 2) ; la simulation se recalcule en conditionnant sur ce résultat.
+Les verrous sont conservés localement (`localStorage`) et **synchronisés entre appareils**
+(iPhone / PC) via Firebase Realtime Database : un même *code de synchro* saisi sur
+plusieurs appareils partage les résultats en temps réel (bouton ☁️).
+
 ## Avertissement
 
 Modèle statistique à but exploratoire/pédagogique. Les probabilités reflètent des
