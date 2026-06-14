@@ -599,10 +599,28 @@ function runWin(m,G){
       `<td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
     h+=`</tbody></table>`;
     const evp=bestEV(G).pred;
-    if(evp[0]!==best.pred[0]||evp[1]!==best.pred[1])
-      h+=`<div class="note warn">⚠️ La reco gagnante (${best.pred[0]}-${best.pred[1]}) diffère du prono à points-max (${evp[0]}-${evp[1]}) : être distancé pousse à prendre de la variance pour pouvoir doubler le leader.</div>`;
-    else h+=`<div class="note">Ici, jouer la valeur sûre maximise aussi tes chances de titre.</div>`;
-    h+=`<div class="note">Adversaires simulés selon leur <b>précision mesurée</b> (un joueur calibré joue ~optimal → plus dur à doubler). Plus tu saisis de pronos réels, plus c'est fiable. Relance à chaque journée.</div>`;
+    // ===== Explication "pourquoi cette reco" =====
+    const st2=standings(); const meR=st2.find(r=>r.p===ME); const leadR=st2[0];
+    const gap=leadR.pts-meR.pts; const behind=(leadR.p!==ME);
+    const styleR=playerStyle(); const lp=projectPick(leadR.p,G,styleR);
+    const exactP=100*G.g[best.pred[0]][best.pred[1]];
+    const isEV=(evp[0]===best.pred[0]&&evp[1]===best.pred[1]);
+    let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi jouer ${best.pred[0]}-${best.pred[1]} ?</b>`;
+    why+=`<ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
+    why+=`<li>Ta situation : <b>${meR.pos}ᵉ</b>${behind?`, à <b>${gap} pt(s)</b> du leader (${leadR.p})`:` — tu <b>mènes</b>`}.</li>`;
+    why+=`<li>Le modèle voit ce match <b>${(100*G.pH).toFixed(0)}%</b> ${m.home} · <b>${(100*G.pD).toFixed(0)}%</b> nul · <b>${(100*G.pA).toFixed(0)}%</b> ${m.away}. Le score exact ${best.pred[0]}-${best.pred[1]} a <b>${exactP.toFixed(1)}%</b> de tomber.</li>`;
+    if(!behind){
+      why+=`<li>En tête, la stratégie est de <b>sécuriser</b> : ce prono à points espérés max (${expPoints(best.pred,G).toFixed(2)} pts) protège ton avance, pas besoin de risque.</li>`;
+    } else if(isEV){
+      why+=`<li>Ici la <b>valeur sûre</b> est aussi la meilleure pour le titre : sur ce match précis, prendre de la variance ne rapporterait pas plus. Joue solide.</li>`;
+    } else {
+      why+=`<li>Le leader jouera sans doute <b>${lp?lp[0]+'-'+lp[1]:'la valeur sûre'}</b> (≈ le prono à points max <b>${evp[0]}-${evp[1]}</b>). Si tu joues pareil, ton retard de ${gap} pts <b>gèle</b> — tu ne le doubles jamais.</li>`;
+      why+=`<li>👉 <b>${best.pred[0]}-${best.pred[1]}</b> te <b>démarque</b> du leader : un peu moins de points espérés (${expPoints(best.pred,G).toFixed(2)} vs ${expPoints(evp,G).toFixed(2)}), mais s'il tombe tu <b>gagnes du terrain</b> pendant qu'il le rate. C'est la variance maîtrisée qu'il te faut pour remonter.</li>`;
+    }
+    why+=`<li>Bilan simulé : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b> de finir 1ᵉʳ, ${(100*best.podP).toFixed(0)}% de podium — la meilleure de tes options sur ${res.length} testées.</li>`;
+    why+=`</ul></div>`;
+    h+=why;
+    h+=`<div class="note">Adversaires simulés selon leur <b>précision mesurée</b>. ⚠️ La phase finale et les bonus ne sont pas encore dans cette projection (en cours d'intégration). Relance à chaque journée.</div>`;
     $('recoOut').innerHTML=h;
   },30);
 }
