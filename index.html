@@ -801,7 +801,7 @@ function renderTable(){
   $('moreBtn').textContent = state.showAll ? 'Réduire' : 'Afficher les 48 équipes';
   $('tnote').textContent = 'Titre / Finale / Demie : probabilité d’atteindre ce stade. Qualif. : accès aux 16es. '+
     (hasCons?'Δ : écart en points de % face au scénario libre.':'');
-  $('foot').textContent = 'Modèle Elo→Poisson. Bonus hôte +'+state.params.hostBonus+' Elo, '+state.params.divGoals+' Elo/but, '+state.params.muTotal.toFixed(2).replace('.',',')+' buts/match. '+fmt0(state.nSims)+' simulations.';
+  $('foot').textContent = 'Modèle Elo→Poisson. Bonus hôte +'+state.params.hostBonus+' Elo, '+state.params.divGoals+' Elo/but, '+state.params.muTotal.toFixed(2).replace('.',',')+' buts/match. '+fmt0(state.nSims)+' simulations.'+(window.__eloInfo||'');
 }
 
 function renderStatus(){
@@ -867,6 +867,19 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
     if (event.scale !== 1) { event.preventDefault(); }
   }, { passive: false });
 }
+
+// Elo à jour depuis eloratings.net (elo.json régénéré chaque jour par GitHub Actions).
+// Matching normalisé (accents/apostrophes) ; repli silencieux sur les Elo intégrés.
+(function(){
+  const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[’']/g,"'").toLowerCase().trim();
+  fetch('elo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+    if(!d||!d.elo) return;
+    const byNorm={}; for(const k in d.elo) byNorm[norm(k)]=d.elo[k];
+    let n=0; TEAMS.forEach(t=>{ const v=byNorm[norm(t.name)]; if(Number.isFinite(v)&&v!==t.elo){ t.elo=v; n++; } });
+    if(n){ window.__eloInfo = ' · Elo eloratings.net MAJ '+(d._updated||'?');
+      state.baseline=null; state.current=null; scheduleRun(50); }
+  }).catch(()=>{});
+})();
 
 window.addEventListener('pagehide', saveToLocalStorage);
 window.addEventListener('beforeunload', saveToLocalStorage);

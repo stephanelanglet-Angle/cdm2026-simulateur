@@ -110,7 +110,7 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
   <div class="tbl-scroll"><table id="styleTbl"></table></div>
 </div>
 
-<div class="foot">Castrol Legends · données initiales = 8 matchs joués. Les pronos des autres sont cachés avant le coup d'envoi : on projette leur style. Réglages bonus à venir.</div>
+<div class="foot">Castrol Legends · données initiales = 8 matchs joués. Les pronos des autres sont cachés avant le coup d'envoi : on projette leur style. <span id="eloInfo"></span></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -567,6 +567,13 @@ window.addEventListener('focus', ()=>{ syncParamsFromMain(); renderAll(); });
 /* ======================= INIT ======================= */
 loadLocal();
 renderAll();
+// Elo à jour depuis eloratings.net (elo.json régénéré chaque jour par GitHub Actions).
+// Repli silencieux sur les Elo intégrés si le fichier est absent.
+fetch('elo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+  if(d&&d.elo){ Object.assign(ELO,d.elo);
+    const el=document.getElementById('eloInfo'); if(el) el.textContent='Elo : eloratings.net, MAJ '+(d._updated||'?')+'.';
+    renderAll(); }
+}).catch(()=>{});
 const savedCode=localStorage.getItem(CODE_KEY);
 if(savedCode) connect(savedCode); else setSync('Sync désactivée — clique sur ☁️');
 </script>
