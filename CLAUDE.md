@@ -25,15 +25,22 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 
 ## Gotchas
 - **Scotland = code `SQ`** dans eloratings.net (`SC` = Seychelles).
+- **Cron GitHub Actions** : ne pas planifier à l'heure ronde (`0 H * * *`) — créneau congestionné, runs planifiés retardés/abandonnés. Update-elo tourne à `'23 5,13,21 * * *'`. Le script écrit `_updated` à la date du jour à chaque run ⇒ un run réussi committe toujours (sauf si scores identiques ET même date). Déclencher à la main : onglet Actions → Run workflow (ou lancer `node scripts/update-elo.mjs` en local puis commit).
 - Dans le JS des pages, `$ = getElementById` → passer un **id nu** (`$('foo')`), jamais `$('#foo')`.
 - Persistance Castrol versionnée : clé `castrol_legends_state_v2`, `SCHEMA=2`. Les données d'un ancien schéma (local/cloud) sont **ignorées** (sinon écrasement des résultats + boucle de rendu).
 - Saisie des pronos : `detailBusy()` (garde 4 s + focus) empêche un push de synchro d'un autre appareil de ré-rendre `renderDetail` et d'effacer la frappe en cours. Ne pas reconstruire le panneau pendant la saisie.
 - L'Action GitHub exige « Read and write permissions » (Settings → Actions) — déjà activé.
 - Bracket KO (matchs 73-104) : la sim les **projette** mais ils ne sont pas encore saisissables dans l'UI.
 
+## Calibrage auto des 3 paramètres
+- **Castrol** ré-estime `hostBonus/divGoals/muTotal` depuis les **scores observés** par MAP : NLL de Poisson + pénalité gaussienne ancrée sur 60/300/2,70 (peu de matchs ⇒ proche des défauts ; au fil du tournoi ⇒ piloté par les données). Fonction `calibrate()` + carte « Calibrage tournoi » (suggestion + toggle auto).
+- Publie dans la **clé localStorage dédiée `cdm2026_calib`** `{auto,hostBonus,divGoals,muTotal,n,obsMu}`. La **régie consomme cette clé en lecture seule** (applique si `auto`, grise les curseurs, badge « calé sur le tournoi » / « suggère… »). Castrol = autorité du calibrage ; pas d'inversion de la source des paramètres.
+- Le scoring se cale uniquement sur les scores joués (`m.res`, noms FR via `EN2FR`). Bonus hôte = 3 équipes ⇒ bouge lentement (honnête).
+
 ## Sync
 - **Firebase Realtime Database** (projet `cdm2026-sync`, config publique dans `index.html`), chemin `rooms/$code` (accès si `$code.length >= 6`). Même « code de synchro » sur chaque appareil = résultats partagés iPhone/PC.
 - Régie ↔ Castrol : localStorage même origine + resync sur load/focus/visibilitychange/événement `storage`.
+- `calibAuto` est **local à l'appareil** (stocké dans `cdm2026_calib`, pas synchronisé via Firebase).
 
 ## Commandes
 - Serveur local : `python -m http.server 8765` (cf. `.claude/launch.json`).
@@ -43,3 +50,4 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 - UI de saisie des matchs à élimination directe (n°73-104), quand le bracket se matérialise après les poules.
 - Couche d'ajustement Elo manuel (blessures/météo), par-dessus l'auto eloratings.
 - Optionnel : niveau d'audace réglable.
+- Calibrage auto : `calibAuto` par défaut OFF (mode suggestion) ; l'utilisateur active l'auto dans Castrol. Limite v1 : si la régie sauvegarde pendant que l'auto est ON, les params calibrés deviennent le « manuel » persisté (pas de baseline manuel séparé). Curseurs régie : pas grossiers (hôte ±10, div ±10, μ ±0,05) ⇒ le thumb se cale sur le cran, le libellé porte la valeur exacte.
