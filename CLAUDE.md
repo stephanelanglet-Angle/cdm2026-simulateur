@@ -17,6 +17,12 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 - `DIV_GOALS=300` = Elo par but de supériorité (≠ le 400 de la proba de victoire).
 - Barème Castrol : **4/3/2/0** (exact / écart / résultat / faux). **Tous les bonus = 4 pts** (Tor / 4 DF / 12 vainqueurs de groupe ordre A,B,C,D,F,G,H,I,J,K,L,E / champion).
 
+## Stratégie de reco (Castrol)
+- Objectif = **gagner le concours**, pas marquer dans l'absolu. Quand on est distancé, la reco optimise **P(doubler le leader)** (`winSim` suit `overP` + écart final moyen) ; quand on mène, **P(finir 1er)**.
+- `catchUpPick(G, prono_leader, aggr)` : le « futur moi » simulé maximise l'avantage **tête-à-tête** vs le leader (variance utile), au lieu de juste éviter sa case (ancien `bestEVdiff`, qui le suivait sans jamais le doubler → écart gelé).
+- **Braquet** (`let braquet`, dial Prudent→All-in, défaut Agressif si distancé) : `aggr` injecté dans `winSim` ET appliqué à toute la fin de saison simulée. Monter = plus de variance (utile si le retard ne bouge pas), baisser en se rapprochant. En tête, `aggr=0` (sécuriser).
+- Navigation : onglets réciproques `.pgnav` (Régie ↔ Castrol) en haut des deux pages.
+
 ## Règles de travail (IMPORTANT)
 - **Ne jamais inventer de scores.** La CDM 2026 est postérieure au cutoff → toujours vérifier sur le web.
 - **Ne pas modifier les 3 params à la place de l'utilisateur** sans accord — il calibre à la main au fil du tournoi.
@@ -49,5 +55,5 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 ## Reste à faire
 - UI de saisie des matchs à élimination directe (n°73-104), quand le bracket se matérialise après les poules.
 - Couche d'ajustement Elo manuel (blessures/météo), par-dessus l'auto eloratings.
-- Optionnel : niveau d'audace réglable.
+- ~~Niveau d'audace réglable~~ → fait (braquet, cf. « Stratégie de reco »).
 - Calibrage auto : `calibAuto` par défaut OFF (mode suggestion) ; l'utilisateur active l'auto dans Castrol. Limite v1 : si la régie sauvegarde pendant que l'auto est ON, les params calibrés deviennent le « manuel » persisté (pas de baseline manuel séparé). Curseurs régie : pas grossiers (hôte ±10, div ±10, μ ±0,05) ⇒ le thumb se cale sur le cran, le libellé porte la valeur exacte.
