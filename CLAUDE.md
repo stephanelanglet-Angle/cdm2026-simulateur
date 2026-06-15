@@ -18,9 +18,10 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 - Barème Castrol : **4/3/2/0** (exact / écart / résultat / faux). **Tous les bonus = 4 pts** (Tor / 4 DF / 12 vainqueurs de groupe ordre A,B,C,D,F,G,H,I,J,K,L,E / champion).
 
 ## Stratégie de reco (Castrol)
-- Objectif = **gagner le concours**, pas marquer dans l'absolu. Quand on est distancé, la reco optimise **P(doubler le leader)** (`winSim` suit `overP` + écart final moyen) ; quand on mène, **P(finir 1er)**.
-- `catchUpPick(G, prono_leader, aggr)` : le « futur moi » simulé maximise l'avantage **tête-à-tête** vs le leader (variance utile), au lieu de juste éviter sa case (ancien `bestEVdiff`, qui le suivait sans jamais le doubler → écart gelé).
-- **Braquet** (`let braquet`, dial Prudent→All-in, défaut Agressif si distancé) : `aggr` injecté dans `winSim` ET appliqué à toute la fin de saison simulée. Monter = plus de variance (utile si le retard ne bouge pas), baisser en se rapprochant. En tête, `aggr=0` (sécuriser).
+- Objectif = **gagner le concours**, pas marquer dans l'absolu. Distancé → la reco optimise **P(doubler le leader)** (`winSim` suit `overP` + écart final moyen) ; en tête → **P(finir 1er)**.
+- **`winSim` : le « futur moi » joue EV** (`meFut=ev`) sur tous les matchs à venir. Leçon clé (vérifiée) : différencier PARTOUT ruine l'espérance → `P(doubler)` s'effondrait à ~0 %. La prise de risque se décide **match par match**, pas en politique globale.
+- `catchUpPick(G, prono_leader, aggr)` : maximise la **variance de l'écart (moi − leader)** sur des scores **plausibles** (top-10 probables, sinon « all-in » choisit du 0-0 pour un gros favori). Sert à générer des candidats contrariens pour le match courant.
+- `runWin` : un seul `winSim` (candidats appariés via `reseed(SIM_SEED)`, RNG reseedable). **🎯 Cible (défaut)** = le prono qui maximise `P(doubler)`. Niveaux manuels (Prudent→All-in) = variance **forcée**, assumée et chiffrée (le « pourquoi » montre que Cible ferait souvent mieux). Vérité honnête affichée : beaucoup de matchs restants ⇒ jouer solide ; la variance paie en **fin de tournoi** (peu de matchs) → Cible se démarque alors tout seul.
 - Navigation : onglets réciproques `.pgnav` (Régie ↔ Castrol) en haut des deux pages.
 
 ## Règles de travail (IMPORTANT)
