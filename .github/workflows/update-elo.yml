@@ -4,7 +4,10 @@ name: Maj Elo (eloratings.net)
 # Déclenchable aussi à la main (onglet Actions -> Run workflow).
 on:
   schedule:
-    - cron: '0 5 * * *'      # tous les jours à 05:00 UTC
+    # Minutes décalées (pas à l'heure ronde : créneau congestionné chez GitHub,
+    # les runs planifiés y sont souvent retardés ou abandonnés). 3x/jour pour
+    # rattraper les Elo après les fenêtres de matchs (matin / après-midi / soir UTC).
+    - cron: '23 5,13,21 * * *'
   workflow_dispatch: {}
 
 permissions:
