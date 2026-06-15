@@ -185,10 +185,10 @@ const SCHEDULE = [
   {n:6,d:'2026-06-13',g:'D',a:'Australia',b:'Turkey',res:[2,0]},
   {n:7,d:'2026-06-13',g:'B',a:'Qatar',b:'Switzerland',res:[1,1]},
   {n:8,d:'2026-06-13',g:'C',a:'Haiti',b:'Scotland',res:[0,1]},
-  {n:9,d:'2026-06-14',g:'E',a:'Ivory Coast',b:'Ecuador'},
-  {n:10,d:'2026-06-14',g:'E',a:'Germany',b:'Curaçao'},
-  {n:11,d:'2026-06-14',g:'F',a:'Netherlands',b:'Japan'},
-  {n:12,d:'2026-06-14',g:'F',a:'Sweden',b:'Tunisia'},
+  {n:9,d:'2026-06-14',g:'E',a:'Ivory Coast',b:'Ecuador',res:[1,0]},
+  {n:10,d:'2026-06-14',g:'E',a:'Germany',b:'Curaçao',res:[7,1]},
+  {n:11,d:'2026-06-14',g:'F',a:'Netherlands',b:'Japan',res:[2,2]},
+  {n:12,d:'2026-06-14',g:'F',a:'Sweden',b:'Tunisia',res:[5,1]},
   {n:13,d:'2026-06-15',g:'H',a:'Saudi Arabia',b:'Uruguay'},
   {n:14,d:'2026-06-15',g:'H',a:'Spain',b:'Cape Verde'},
   {n:15,d:'2026-06-15',g:'G',a:'Iran',b:'New Zealand'},
@@ -283,7 +283,7 @@ const BONUS_PT = 4;   // points par bonne réponse bonus
 /* ======================= ÉTAT ======================= */
 // Paramètres du modèle : SOURCE UNIQUE = le simulateur principal (localStorage partagé,
 // même origine). Garantit des probas 1N2 strictement identiques entre les deux pages.
-const P = { hostBonus:60, divGoals:300, muTotal:2.70 };
+const P = { hostBonus:60, divGoals:280, muTotal:3.15 };   // défauts recalés sur les 12 premiers matchs (14/06) ; μ = observé brut (3,17)
 function syncParamsFromMain(){
   try{ const d=JSON.parse(localStorage.getItem('cdm2026_simulateur_state')||'{}');
     if(d.state&&d.state.params){ const q=d.state.params;
@@ -937,7 +937,9 @@ function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize()))
 // renvoie true si appliqué, false si schéma incompatible (ancienne version) -> évite la corruption
 function applyState(s){
   if(!s || s.v!==SCHEMA) return false;
-  if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ m.res=sm.res||null; if(sm.preds)m.preds=sm.preds; } }); }
+  if(s.matches){ s.matches.forEach(sm=>{ const m=MATCHES.find(x=>x.id===sm.id); if(m){ if(sm.res!=null) m.res=sm.res; if(sm.preds)m.preds=sm.preds; } }); }
+  // NB : un résultat sauvegardé écrase le calendrier ; un résultat ABSENT du save garde le score officiel
+  //      câblé dans SCHEDULE (sinon les matchs bakés 9-12 seraient effacés par un vieux state).
   if(s.bonus){ BONUS_ACTUAL = { semis: Array.isArray(s.bonus.semis)? s.bonus.semis.slice(0,4) : [null,null,null,null],
     champ: s.bonus.champ||null, tor: s.bonus.tor||null };
     while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
