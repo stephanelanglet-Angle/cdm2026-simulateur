@@ -69,7 +69,7 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 .tag{font-size:10.5px;font-family:var(--mono);border:1px solid var(--line2);border-radius:5px;padding:0 5px;color:var(--muted)}
 .foot{color:var(--faint);font-size:12px;margin-top:20px;text-align:center}
 .editrow{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:3px 0}
-.editrow .nm{flex:1;color:var(--muted)}
+.editrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -634,7 +634,7 @@ function renderDetail(){
     // saisie pronos
     h+=`<div style="margin-top:12px"><div class="kv"><span>Saisir les pronos (le tien + ceux des autres une fois visibles)</span><span></span></div>`;
     PLAYERS.forEach(pl=>{ const pr=m.preds[pl];
-      h+=`<div class="editrow"><span class="nm">${pl}${pl===ME?' ⭐':''}</span>`+
+      h+=`<div class="editrow"><span class="nm" title="${pl}">${pl.split('_')[0]}${pl===ME?' ⭐':''}</span>`+
          `<input class="sc pin" data-pl="${pl}" data-k="0" value="${pr?pr[0]:''}">`+
          `<input class="sc pin" data-pl="${pl}" data-k="1" value="${pr?pr[1]:''}"></div>`; });
     h+=`<div class="editrow"><span class="nm">Résultat final (quand joué)</span>`+
@@ -647,6 +647,11 @@ function renderDetail(){
 }
 
 function wireDetail(m,G){
+  // iPhone : clavier numérique direct sur chaque case score (sinon clavier alpha par défaut)
+  document.querySelectorAll('#detail .sc').forEach(i=>{
+    i.setAttribute('inputmode','numeric'); i.setAttribute('pattern','[0-9]*'); i.setAttribute('maxlength','2');
+    i.setAttribute('autocomplete','off'); i.setAttribute('enterkeyhint','next');
+  });
   const rSave=$('rSave');
   if(rSave) rSave.onclick=()=>{ const a=parseInt($('rA').value,10), b=parseInt($('rB').value,10);
     if(Number.isFinite(a)&&Number.isFinite(b)){ m.res=[a,b]; afterEdit(); } };
