@@ -884,6 +884,51 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'Mac
 window.addEventListener('pagehide', saveToLocalStorage);
 window.addEventListener('beforeunload', saveToLocalStorage);
 
+/* ====== Calibrage tournoi (lecture seule) ======
+   Castrol ré-estime hostBonus / divGoals / muTotal depuis les résultats observés et publie le
+   résultat dans localStorage('cdm2026_calib'). Ici on l'applique quand l'auto est activé (réglé
+   dans Castrol). On NE touche PAS à la source des paramètres : simple lecture + application. */
+(function(){
+  const KEY='cdm2026_calib';
+  let lastSig=null;
+  const read=()=>{ try{ return JSON.parse(localStorage.getItem(KEY)||'null'); }catch(e){ return null; } };
+  function badge(c){
+    let el=$('calibBadge');
+    if(!el){ const f=$('foot'); if(!f||!f.parentNode) return; el=document.createElement('div'); el.id='calibBadge';
+      el.style.cssText='text-align:center;font-size:12.5px;margin-top:8px;color:var(--gold)'; f.parentNode.insertBefore(el,f); }
+    if(c&&c.auto){ el.textContent='🎯 Modèle calé sur le tournoi ('+(c.n||0)+' matchs joués) — réglé dans Castrol Legends.'; }
+    else if(c&&c.n>=3){ el.textContent='📊 Le tournoi ('+c.n+' matchs) suggère : hôte +'+c.hostBonus+' · '+c.divGoals+' Elo/but · '+(+c.muTotal).toFixed(2).replace('.',',')+' buts/match (activer l’auto dans Castrol Legends).'; }
+    else { el.textContent=''; }
+  }
+  function setParams(h,d,m){
+    state.params.hostBonus=+h; state.params.divGoals=+d; state.params.muTotal=+m;
+    if($('pHost')){ $('pHost').value=state.params.hostBonus; $('vHost').textContent='+'+state.params.hostBonus+' Elo'; }
+    if($('pDiv')){ $('pDiv').value=state.params.divGoals; $('vDiv').textContent=''+state.params.divGoals; }
+    if($('pMu')){ $('pMu').value=state.params.muTotal; $('vMu').textContent=state.params.muTotal.toFixed(2).replace('.',','); }
+    if(typeof renderMatches==='function') renderMatches();
+    if(typeof renderDetail==='function') renderDetail();
+    if(typeof scheduleRun==='function') scheduleRun(60);
+  }
+  function apply(force){
+    const c=read(); badge(c);
+    const auto=!!(c&&c.auto);
+    // curseurs pilotés par le tournoi quand l'auto est actif : on les grise (le libellé fait foi)
+    ['pHost','pDiv','pMu'].forEach(id=>{ const el=$(id); if(el){ el.disabled=auto; el.style.opacity=auto?'0.55':''; } });
+    if(auto){
+      const sig=c.hostBonus+'|'+c.divGoals+'|'+c.muTotal;
+      if(!force && sig===lastSig) return; lastSig=sig;
+      setParams(c.hostBonus,c.divGoals,c.muTotal);
+    } else {
+      // auto désactivé : curseurs réactivés, l'utilisateur reprend la main (le badge montre la suggestion)
+      lastSig=null;
+    }
+  }
+  apply(true);
+  window.addEventListener('focus', ()=>apply(false));
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) apply(false); });
+  window.addEventListener('storage', e=>{ if(e.key===KEY) apply(false); });
+})();
+
 /* ============================================================================
    SYNCHRONISATION CLOUD (Firebase Realtime Database)
    Couche additive : observe la mémoire locale et la synchronise entre appareils

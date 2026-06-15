@@ -116,6 +116,8 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
   <div class="tbl-scroll"><table id="styleTbl"></table></div>
 </div>
 
+<div class="card" id="calibCard"></div>
+
 <div class="foot">Castrol Legends · données initiales = 8 matchs joués. Les pronos des autres sont cachés avant le coup d'envoi : on projette leur style. <span id="eloInfo"></span></div>
 </div>
 
@@ -354,6 +356,54 @@ function bestEV(G){
   let best=[0,0],be=-1;
   for(let a=0;a<=6;a++)for(let b=0;b<=6;b++){ const e=expPoints([a,b],G); if(e>be){be=e;best=[a,b];} }
   return {pred:best,ev:be};
+}
+
+/* ======================= CALIBRAGE AUTO DES 3 PARAMÈTRES =======================
+   À partir des scores réellement observés, on ré-estime hostBonus / divGoals / muTotal
+   par maximum a posteriori (MAP) : on minimise la log-vraisemblance négative de Poisson
+   des scores observés + une pénalité gaussienne qui ancre chaque paramètre sur sa valeur
+   par défaut (60 / 300 / 2,70). Conséquence voulue : peu de matchs => on bouge à peine
+   (l'ancrage domine) ; au fil du tournoi, les données prennent le dessus. Le bonus hôte ne
+   concerne que 3 équipes => il reste près de sa valeur par défaut tant qu'on manque de matchs. */
+const CALIB_KEY='cdm2026_calib';
+const CALIB_PRIOR={ H:{m:60,s:35}, D:{m:300,s:70}, M:{m:2.70,s:0.45} };
+let calibAuto=false, lastCalib=null;
+try{ const _c=JSON.parse(localStorage.getItem(CALIB_KEY)||'{}'); calibAuto=!!_c.auto; }catch(e){}
+
+function calibrate(){
+  const played = MATCHES.filter(m=>m.res && ELO[m.home]!=null && ELO[m.away]!=null);
+  const n=played.length, PR=CALIB_PRIOR;
+  let totGoals=0, hostMatches=0;
+  played.forEach(m=>{ totGoals+=m.res[0]+m.res[1]; if(HOSTS.has(m.home)||HOSTS.has(m.away))hostMatches++; });
+  const obsMu = n? totGoals/n : null;
+  if(n<3) return { hostBonus:PR.H.m, divGoals:PR.D.m, muTotal:PR.M.m, n, hostMatches, obsMu, weak:true };
+  const cl=x=> x<0.12?0.12:(x>6?6:x);
+  function nll(H,D,M){
+    let f=0;
+    for(let i=0;i<n;i++){ const m=played[i];
+      const eh=ELO[m.home]+(HOSTS.has(m.home)?H:0), ea=ELO[m.away]+(HOSTS.has(m.away)?H:0);
+      const s=(eh-ea)/D, la=cl((M+s)/2), lb=cl((M-s)/2);
+      f += la - m.res[0]*Math.log(la) + lb - m.res[1]*Math.log(lb);
+    }
+    f += (H-PR.H.m)*(H-PR.H.m)/(2*PR.H.s*PR.H.s);
+    f += (D-PR.D.m)*(D-PR.D.m)/(2*PR.D.s*PR.D.s);
+    f += (M-PR.M.m)*(M-PR.M.m)/(2*PR.M.s*PR.M.s);
+    return f;
+  }
+  const gr=(Math.sqrt(5)-1)/2;
+  function gmin(fn,lo,hi){ let a=lo,b=hi,c=b-gr*(b-a),d=a+gr*(b-a),fc=fn(c),fd=fn(d);
+    for(let i=0;i<42;i++){ if(fc<fd){b=d;d=c;fd=fc;c=b-gr*(b-a);fc=fn(c);} else {a=c;c=d;fc=fd;d=a+gr*(b-a);fd=fn(d);} }
+    return (a+b)/2; }
+  let H=PR.H.m,D=PR.D.m,M=PR.M.m;
+  for(let it=0;it<28;it++){ H=gmin(h=>nll(h,D,M),-40,200); D=gmin(d=>nll(H,d,M),120,700); M=gmin(mm=>nll(H,D,mm),1.2,4.2); }
+  return { hostBonus:H, divGoals:D, muTotal:M, n, hostMatches, obsMu, weak:false };
+}
+function calibRounded(c){ return { hostBonus:Math.round(c.hostBonus), divGoals:Math.round(c.divGoals), muTotal:Math.round(c.muTotal*100)/100 }; }
+function applyCalibToP(){ if(calibAuto && lastCalib && !lastCalib.weak){ const r=calibRounded(lastCalib); P.hostBonus=r.hostBonus; P.divGoals=r.divGoals; P.muTotal=r.muTotal; } }
+function refreshCalib(){
+  lastCalib=calibrate(); const r=calibRounded(lastCalib);
+  try{ localStorage.setItem(CALIB_KEY, JSON.stringify({ auto:calibAuto, hostBonus:r.hostBonus, divGoals:r.divGoals, muTotal:r.muTotal, n:lastCalib.n, obsMu:lastCalib.obsMu })); }catch(e){}
+  applyCalibToP();
 }
 
 /* ======================= STYLE DES ADVERSAIRES ======================= */
@@ -728,9 +778,9 @@ function detailBusy(){
   const focusedHere = ae && d && d.contains(ae) && /\bsc\b/.test(ae.className||'');
   return focusedHere || (Date.now()-lastDetailInput < 4000);   // saisie en cours ou très récente
 }
-function renderAll(){ syncParamsFromMain(); renderStandings(); renderMatchList();
+function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
   if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
-  renderStyle(); renderBonus(); }
+  renderStyle(); renderBonus(); renderCalib(); }
 
 const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
 function teamSelect(k, val, ph){
@@ -783,6 +833,28 @@ function renderStyle(){
        `<td class="mono">${(100*s.skill).toFixed(0)}%</td>`+
        `<td style="color:${tcol};font-weight:600">${threat}</td></tr>`; });
   h+='</tbody>'; $('styleTbl').innerHTML=h;
+}
+
+function renderCalib(){
+  const el=$('calibCard'); if(!el) return;
+  const c=lastCalib||calibrate(); const r=calibRounded(c);
+  const muTxt=c.obsMu!=null? c.obsMu.toFixed(2).replace('.',',') : '—';
+  let h=`<h2>Calibrage tournoi <small>cale les 3 paramètres du modèle sur les résultats observés</small></h2>`;
+  h+=`<label class="kv" style="cursor:pointer"><span>🎯 Caler automatiquement le modèle sur le tournoi (chaque jour)</span>`+
+     `<input type="checkbox" id="calibAutoChk" ${calibAuto?'checked':''} style="width:18px;height:18px;flex:none"></label>`;
+  h+=`<div class="note">${c.n} match${c.n>1?'s':''} joué${c.n>1?'s':''} · buts/match observés <b>${muTxt}</b> (réf. modèle 2,70).</div>`;
+  h+=`<div class="tbl-scroll"><table style="margin-top:6px"><thead><tr><th class="l">Paramètre</th><th>Modèle actuel</th><th>Suggéré par le tournoi</th></tr></thead><tbody>`;
+  const row=(lab,cur,sug,extra)=>`<tr><td class="l">${lab}</td><td class="mono">${cur}</td><td class="mono" style="color:var(--gold)">${sug}${extra||''}</td></tr>`;
+  h+=row('Bonus hôte', '+'+P.hostBonus+' Elo', '+'+r.hostBonus+' Elo', c.hostMatches!=null?` <span class="tag">${c.hostMatches} m. hôtes</span>`:'');
+  h+=row('Elo par but (diviseur)', P.divGoals, r.divGoals);
+  h+=row('Buts attendus / match', P.muTotal.toFixed(2).replace('.',','), r.muTotal.toFixed(2).replace('.',','));
+  h+=`</tbody></table></div>`;
+  if(c.weak){ h+=`<div class="note warn">Trop peu de matchs joués (&lt; 3) : on garde les valeurs par défaut, l'estimation ne serait pas fiable.</div>`; }
+  else { h+=`<div class="note">Estimation régularisée (MAP) : ancrée sur les valeurs par défaut quand il y a peu de matchs, de plus en plus pilotée par les données au fil du tournoi. Le bonus hôte ne porte que sur 3 équipes → il bouge lentement.</div>`; }
+  if(calibAuto){ h+=`<div class="note" style="color:var(--grass)">✅ Auto activé — le simulateur principal (la régie) suit aussi ces valeurs.</div>`; }
+  el.innerHTML=h;
+  const chk=$('calibAutoChk');
+  if(chk) chk.onchange=()=>{ calibAuto=chk.checked; refreshCalib(); renderAll(); };
 }
 
 /* ======================= PERSISTENCE + SYNC ======================= */
@@ -841,7 +913,7 @@ $('paramBtn').onclick=()=>{ const b=$('paramBox'); b.style.display=b.style.displ
   $('paramShow').innerHTML=`<span class="tag">Bonus hôte +${P.hostBonus} Elo</span> <span class="tag">Diviseur ${P.divGoals} Elo/but</span> <span class="tag">${P.muTotal.toFixed(2)} buts/match</span>`; };
 // relire les paramètres calibrés ; NE re-render QUE s'ils ont vraiment changé
 // (évite d'effacer la reco au moindre changement d'onglet)
-function syncIfChanged(){ const b=P.hostBonus+'|'+P.divGoals+'|'+P.muTotal; syncParamsFromMain();
+function syncIfChanged(){ const b=P.hostBonus+'|'+P.divGoals+'|'+P.muTotal; syncParamsFromMain(); refreshCalib();
   if(P.hostBonus+'|'+P.divGoals+'|'+P.muTotal!==b){ lastReco=null; renderAll(); } }
 window.addEventListener('visibilitychange', ()=>{ if(!document.hidden) syncIfChanged(); });
 window.addEventListener('focus', syncIfChanged);
