@@ -554,9 +554,9 @@ function assignThirds(groups){   // couplage de Kuhn : 8 groupes (meilleurs 3es)
   return assign;
 }
 
-function winSim(selMatch, candidates, nSims){
-  // "futur moi" = jeu EV réaliste sur tous les matchs à venir (différencier PARTOUT ruine l'espérance).
-  // La prise de risque se décide match par match : c'est l'objet des candidats testés dans runWin.
+function winSim(selMatch, candidates, nSims, meStrat){
+  // "futur moi" : meStrat 'ev' (défaut) = jeu EV réaliste ; 'var' = variance max vs le leader sur TOUS
+  // les matchs à venir (mode "gagner ou rien"). Sert à chiffrer P(1er) en mode safe vs mode variance.
   const style=playerStyle();
   const leader=standings()[0].p, iLead=(leader===ME);
   const others=PLAYERS.filter(p=>p!==ME);
@@ -567,7 +567,7 @@ function winSim(selMatch, candidates, nSims){
   // pré-calcul des matchs de poule (grille N=8 = rapide)
   const gmInfo=MATCHES.map(m=>{ const G=grid(m.home,m.away,8); const ev=bestEV(G).pred;
     const lp=iLead?null:projectPickFast(style.st[leader],G,ev);
-    const meFut=ev;
+    const meFut=(lp&&meStrat>0)?catchUpPick(G,lp,meStrat):ev;
     const oppFut={}; others.forEach(pl=>oppFut[pl]=projectPickFast(style.st[pl],G,ev));
     return {m,G,meFut,oppFut};
   });
@@ -576,7 +576,7 @@ function winSim(selMatch, candidates, nSims){
   function koInfo(h,a){ const k=h+'|'+a; let ki=koCache[k]; if(ki) return ki;
     const G=grid(h,a,8); const ev=bestEV(G).pred;
     const lp=iLead?null:projectPickFast(style.st[leader],G,ev);
-    const meFut=ev;
+    const meFut=(lp&&meStrat>0)?catchUpPick(G,lp,meStrat):ev;
     const opp={}; others.forEach(pl=>opp[pl]=projectPickFast(style.st[pl],G,ev));
     return koCache[k]={G,meFut,opp};
   }
@@ -717,8 +717,8 @@ function renderDetail(){
     // reco gagnante
     h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
        `<button class="btn primary" id="winBtn">Calculer</button></div>`+
-       `<div class="kv" style="border:none;padding-top:2px"><span>Braquet (audace) <small style="color:var(--faint)">+ on est distancé, + on monte</small></span>`+
-       `<select id="braquetSel" class="bsel" style="flex:none;width:auto"><option value="cible">🎯 Cible (auto)</option><option value="0.15">🛡️ Prudent</option><option value="0.45">⚖️ Équilibré</option><option value="0.75">🔥 Agressif</option><option value="1">🚀 All-in</option></select></div>`+
+       `<div class="kv" style="border:none;padding-top:2px"><span>Stratégie <small style="color:var(--faint)">variance auto-dosée pour gagner</small></span>`+
+       `<select id="braquetSel" class="bsel" style="flex:none;width:auto"><option value="cible">🎯 Mode Gagner (auto)</option><option value="0">🛡️ Prudent (EV)</option><option value="0.1">⚖️ Équilibré</option><option value="0.2">🔥 Agressif</option><option value="0.4">🚀 All-in</option></select></div>`+
        `<div id="recoOut" class="note">Lance le calcul : je simule la fin du tournoi des milliers de fois et je classe tes options par <b>probabilité de doubler le leader</b>.</div></div>`;
     // saisie pronos
     h+=`<div style="margin-top:12px"><div class="kv"><span>Saisir les pronos (le tien + ceux des autres une fois visibles)</span><span></span></div>`;
@@ -766,79 +766,57 @@ function wireDetail(m,G){
   const bsel=$('braquetSel');
   if(bsel){ bsel.value=String(braquet); bsel.onchange=()=>{ braquet=(bsel.value==='cible'?'cible':+bsel.value); runWin(m,G); }; }
 }
-const BRAQUET_LBL={'cible':'Cible (auto)','0.15':'Prudent','0.45':'Équilibré','0.75':'Agressif','1':'All-in'};
+const BRAQUET_LBL={'cible':'Mode Gagner (auto)','0':'Prudent (EV)','0.1':'Équilibré','0.2':'Agressif','0.4':'All-in'};
+const WIN_DOSES=[0,0.08,0.12,0.18,0.28];   // doses de variance du "futur moi" testées par le mode auto
 function runWin(m,G){
   $('recoOut').innerHTML='⏳ Simulation en cours…';
   setTimeout(()=>{
     const st0=standings(); const meR=st0.find(r=>r.p===ME); const leadR=st0[0];
     const behind=(leadR.p!==ME); const gap=leadR.pts-meR.pts;
-    const remaining=MATCHES.filter(x=>!x.res).length;       // matchs de poule encore à jouer
+    const remaining=MATCHES.filter(x=>!x.res).length;
     const styleR=playerStyle(); const lp=behind?projectPick(leadR.p,G,styleR):null;
-    const evp=bestEV(G).pred; const cible=(String(braquet)==='cible');
-    const fmtGap=g=>(g>=0?'+':'')+g.toFixed(1); const key=p=>p[0]+'-'+p[1];
-    // candidats pour CE match : EV + scorelines probables + démarcations plausibles vs le leader
-    const cells=[]; for(let i=0;i<=6;i++)for(let j=0;j<=6;j++)cells.push({k:[i,j],p:G.g[i][j]});
-    cells.sort((a,b)=>b.p-a.p);
-    const cand=[]; const seen=new Set();
-    const push=k=>{ if(!k)return; const s=k[0]+'-'+k[1]; if(!seen.has(s)){seen.add(s);cand.push(k);} };
-    push(evp); cells.slice(0,6).forEach(c=>push(c.k));
-    let forced=null;
-    if(behind){ push(catchUpPick(G,lp,0.5)); push(catchUpPick(G,lp,1));
-      if(!cible){ forced=catchUpPick(G,lp,+braquet); push(forced); } }
-    reseed(SIM_SEED);
-    const res=winSim(m,cand,2800);     // futur = EV ; tous les candidats comparés sur les MÊMES tournois (appariés)
-    const findR=p=>res.find(r=>r.pred[0]===p[0]&&r.pred[1]===p[1]);
-    res.sort(behind
-      ? (a,b)=>(b.overP-a.overP)||(b.winP-a.winP)||(expPoints(b.pred,G)-expPoints(a.pred,G))
-      : (a,b)=>(b.winP-a.winP)||(b.podP-a.podP)||(expPoints(b.pred,G)-expPoints(a.pred,G)));
-    const evRow=findR(evp), topRow=res[0];
-    const best = (behind && !cible && forced) ? (findR(forced)||topRow) : topRow;
-    const helps = behind && evRow && (topRow.overP - evRow.overP > 0.004);   // au-delà du bruit Monte-Carlo
-    const aggrLbl = cible?'Cible':(BRAQUET_LBL[String(braquet)]||(''+braquet));
-    let h=`<div class="big">${best.pred[0]} – ${best.pred[1]}</div>`;
+    const evp=bestEV(G).pred; const cible=(String(braquet)==='cible'); const key=p=>p[0]+'-'+p[1];
+    const pickFor=d=>(d>0&&lp)?catchUpPick(G,lp,d):evp;
+    // baseline "safe" : le futur moi joue EV (dose 0)
+    reseed(SIM_SEED); const safe=winSim(m,[evp],1200,0)[0];
+    // ---- choix de la dose de variance du "futur moi" ----
+    let dose=0, sweep=null;
+    if(behind && cible){
+      // teste plusieurs doses (tirages appariés) et retient celle qui MAXIMISE P(1er).
+      // Quand on mène / quand la variance ne paie pas, l'optimum est 0 -> jeu safe.
+      sweep=WIN_DOSES.map(d=> d===0 ? {d:0,winP:safe.winP,podP:safe.podP}
+        : (function(){ reseed(SIM_SEED); const r=winSim(m,[pickFor(d)],1200,d)[0]; return {d,winP:r.winP,podP:r.podP}; })());
+      dose=sweep.reduce((a,b)=>(b.winP>a.winP||(b.winP===a.winP&&b.d<a.d))?b:a).d;
+    } else if(behind){ dose=+braquet; }
+    const pick=pickFor(dose);
+    reseed(SIM_SEED); const R=winSim(m,[pick],2500,dose)[0];
+    const dlabel=cible?`auto ${dose.toFixed(2)}`:(BRAQUET_LBL[String(braquet)]||(''+braquet));
+    const gain=R.winP>safe.winP+0.002;
+    let h=`<div class="big">${pick[0]} – ${pick[1]}</div>`;
     if(behind){
-      h+=`<div class="note">P(<b>doubler ${leadR.p}</b>) <b style="color:var(--gold)">${(100*best.overP).toFixed(1)}%</b> · P(1ᵉʳ) ${(100*best.winP).toFixed(1)}% · écart final moyen <b>${fmtGap(best.gap)}</b></div>`;
-      h+=`<div class="note">${cible?`🎯 <b>Cible</b> — le prono qui maximise ta proba de doubler ${leadR.p}`:`Braquet <b>${aggrLbl}</b> (forcé)`} · ${remaining} matchs restants, retard ${gap} pts.</div>`;
-      h+=`<table style="margin-top:8px"><thead><tr><th>Ton prono</th><th>P(doubler)</th><th>P(1ᵉʳ)</th><th>Écart moy.</th><th>Pts esp.</th></tr></thead><tbody>`;
-      res.slice(0,6).forEach(r=>{ const me=(r.pred[0]===best.pred[0]&&r.pred[1]===best.pred[1]);
-        h+=`<tr class="${me?'you':''}"><td class="mono">${r.pred[0]}-${r.pred[1]}${me?' ★':''}</td>`+
-        `<td class="pts" style="color:var(--gold)">${(100*r.overP).toFixed(1)}%</td><td class="mono">${(100*r.winP).toFixed(1)}%</td>`+
-        `<td class="mono">${fmtGap(r.gap)}</td><td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
-      h+=`</tbody></table>`;
+      h+=`<div class="note">P(<b>1ᵉʳ</b>) <b style="color:var(--gold)">${(100*R.winP).toFixed(1)}%</b> · podium ${(100*R.podP).toFixed(1)}% · doubler ${leadR.p} ${(100*R.overP).toFixed(1)}%</div>`;
+      h+=`<div class="note">Réf. <b>safe</b> (${key(evp)}) : P(1ᵉʳ) ${(100*safe.winP).toFixed(1)}% · podium ${(100*safe.podP).toFixed(1)}% → ${gain?`<b style="color:var(--grass)">la variance vaut le coup ici</b>`:`pas d'intérêt à te découvrir ici`}.</div>`;
+      if(cible&&sweep){ h+=`<div class="note">🎯 <b>Mode Gagner</b> — dose de variance auto-choisie pour <b>maximiser ta P(1ᵉʳ)</b> (${remaining} matchs restants, retard ${gap} pts). Doses testées → ${sweep.map(s=>`${s.d}:${(100*s.winP).toFixed(1)}%`).join(' · ')}.</div>`; }
     } else {
-      h+=`<div class="note">Meilleure probabilité de finir 1ᵉʳ : <b style="color:var(--gold)">${(100*best.winP).toFixed(1)}%</b> · podium ${(100*best.podP).toFixed(0)}%</div>`;
-      h+=`<table style="margin-top:8px"><thead><tr><th>Ton prono</th><th>P(1ᵉʳ)</th><th>P(podium)</th><th>Pts espérés</th></tr></thead><tbody>`;
-      res.slice(0,6).forEach((r,i)=>{ h+=`<tr class="${i===0?'you':''}"><td class="mono">${r.pred[0]}-${r.pred[1]}</td>`+
-        `<td class="pts">${(100*r.winP).toFixed(1)}%</td><td class="mono">${(100*r.podP).toFixed(0)}%</td>`+
-        `<td class="mono" style="color:var(--faint)">${expPoints(r.pred,G).toFixed(2)}</td></tr>`; });
-      h+=`</tbody></table>`;
+      h+=`<div class="note">En tête → sécuriser. P(<b>1ᵉʳ</b>) <b style="color:var(--gold)">${(100*R.winP).toFixed(1)}%</b> · podium ${(100*R.podP).toFixed(0)}%</div>`;
     }
-    // ===== Explication "pourquoi cette reco" =====
-    const exactP=100*G.g[best.pred[0]][best.pred[1]];
-    let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi jouer ${best.pred[0]}-${best.pred[1]} ?</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
-    why+=`<li>Ta situation : <b>${meR.pos}ᵉ</b>${behind?`, à <b>${gap} pt(s)</b> du leader (${leadR.p})`:` — tu <b>mènes</b>`}.</li>`;
-    why+=`<li>Le modèle voit ce match <b>${(100*G.pH).toFixed(0)}%</b> ${m.home} · <b>${(100*G.pD).toFixed(0)}%</b> nul · <b>${(100*G.pA).toFixed(0)}%</b> ${m.away}. Le score exact ${best.pred[0]}-${best.pred[1]} a <b>${exactP.toFixed(1)}%</b> de tomber.</li>`;
+    // ===== Explication =====
+    const exactP=100*G.g[pick[0]][pick[1]];
+    let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi ${key(pick)} ?</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
+    why+=`<li>Situation : <b>${meR.pos}ᵉ</b>${behind?`, à <b>${gap} pt(s)</b> de ${leadR.p}`:` — tu <b>mènes</b>`}. Match ${(100*G.pH).toFixed(0)}/${(100*G.pD).toFixed(0)}/${(100*G.pA).toFixed(0)}, l'exact ${key(pick)} a ${exactP.toFixed(1)}% de tomber.</li>`;
     if(!behind){
-      why+=`<li>En tête → <b>sécuriser</b> : ce prono à points espérés max (${expPoints(best.pred,G).toFixed(2)} pts) protège ton avance, pas besoin de risque.</li>`;
+      why+=`<li>En tête, le jeu sûr (EV) maximise déjà ta P(1ᵉʳ) — inutile de te découvrir.</li>`;
+    } else if(dose<=0){
+      why+=`<li>La dose optimale ici est <b>0</b> : te démarquer n'augmente pas ta P(1ᵉʳ) et coûterait des points. <b>Joue solide ${key(evp)}</b> — la variance paiera quand il restera moins de matchs.</li>`;
     } else {
-      why+=`<li>Le leader jouera ≈ <b>${lp?key(lp):key(evp)}</b>. Te démarquer ne paie que si <b>tu marques quand LUI rate</b> (un score volatil et différent du sien).</li>`;
-      if(cible){
-        if(helps){
-          why+=`<li>👉 <b>${key(best.pred)}</b> est le pari optimal : P(doubler) <b>${(100*best.overP).toFixed(1)}%</b> contre ${(100*evRow.overP).toFixed(1)}% en jouant la valeur sûre ${key(evp)}, pour ${expPoints(best.pred,G).toFixed(2)} pts espérés (vs ${expPoints(evp,G).toFixed(2)}). La variance vaut le coup ici.</li>`;
-        } else {
-          why+=`<li>👉 Avec <b>${remaining} matchs encore à jouer</b>, te démarquer ne rapporte rien (P(doubler) ≈ identique à la valeur sûre) et coûterait des points. <b>Joue solide : ${key(best.pred)}.</b> Gambler sur chaque match te ferait au contraire <b>décrocher</b>.</li>`;
-          why+=`<li>La variance paiera surtout en <b>fin de tournoi</b>, quand il restera peu de matchs : le mode Cible la déclenchera tout seul à ce moment-là (tu verras la reco se démarquer).</li>`;
-        }
-        why+=`<li>Ton vrai levier d'ici là : <b>battre ${leadR.p} sur un maximum de matchs</b> (le prono ci-dessus est déjà optimal) + la loterie des phases finales et des bonus.</li>`;
-      } else {
-        why+=`<li>👉 Tu <b>forces</b> le braquet ${aggrLbl} → <b>${key(best.pred)}</b> : P(doubler) ${(100*best.overP).toFixed(1)}%${evRow?` (valeur sûre ${key(evp)} : ${(100*evRow.overP).toFixed(1)}%)`:''}, pour ${expPoints(best.pred,G).toFixed(2)} pts espérés.`+
-          `${(best.pred[0]!==topRow.pred[0]||best.pred[1]!==topRow.pred[1])?` Le mode <b>Cible</b> jouerait plutôt <b>${key(topRow.pred)}</b> (P(doubler) ${(100*topRow.overP).toFixed(1)}%).`:''}</li>`;
-      }
+      why+=`<li>Le leader jouera ≈ <b>${key(lp)}</b>. <b>${key(pick)}</b> s'en démarque <b>juste ce qu'il faut</b> (favori en clean sheet) : s'il tombe, tu plantes l'exact (4 pts) quand lui n'a que 2-3.</li>`;
+      why+=`<li>Dose <b>${dose}</b> = le pic de ta P(1ᵉʳ) : <b>${(100*R.winP).toFixed(1)}%</b> vs ${(100*safe.winP).toFixed(1)}% en safe. Plus de variance te ferait <b>décrocher</b>, moins tu plafonnes.</li>`;
     }
+    why+=`<li>Toujours : <b>joue ce pick, pas un 1-1 d'instinct</b> (c'est ta fuite). Et les <b>bonus</b> (champion/buteur/demis) restent ton plus gros levier de remontée.</li>`;
     why+=`</ul></div>`;
     h+=why;
-    h+=`<div class="note">Poules + élimination directe + bonus simulés 2 800 fois (toi : jeu EV sur les matchs à venir, adversaires selon leur précision mesurée). Relance à chaque journée.</div>`;
-    lastReco={ id:m.id, html:h };   // mémoriser pour survivre aux re-rendus (focus/storage/sync)
+    h+=`<div class="note">Poules + élimination directe + bonus simulés 2 500 fois ; « futur toi » joué à la variance ${dlabel}, adversaires selon leur précision. Relance à chaque journée.</div>`;
+    lastReco={ id:m.id, html:h };   // survit aux re-rendus (focus/storage/sync)
     $('recoOut').innerHTML=h;
   },30);
 }
