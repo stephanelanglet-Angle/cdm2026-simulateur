@@ -500,7 +500,7 @@ function bestEVdiff(G, avoid){
   return best||bestEV(G).pred;
 }
 // audace de la reco : 0 = points espérés (sécurité), 1 = démarcation maximale vs le leader
-let braquet='cible';   // 'cible' = auto (cherche le braquet qui maximise P(doubler)), ou un nombre 0..1
+let braquet='grignoter';   // 'grignoter' (score le + probable, remonter), 'cible' (Mode Gagner), ou un nombre = dose
 // pick "remontada" : maximise la VARIANCE de l'écart D = (mes points - points du leader).
 // Pour remonter il ne faut pas juste battre le leader "en moyenne" (le pick EV le fait déjà partout) :
 // il faut un score VOLATIL et ANTI-corrélé à son prono — qui marque gros quand LUI rate.
@@ -718,7 +718,7 @@ function renderDetail(){
     h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
        `<button class="btn primary" id="winBtn">Calculer</button></div>`+
        `<div class="kv" style="border:none;padding-top:2px"><span>Stratégie <small style="color:var(--faint)">variance auto-dosée pour gagner</small></span>`+
-       `<select id="braquetSel" class="bsel" style="flex:none;width:auto"><option value="cible">🎯 Mode Gagner (auto)</option><option value="0">🛡️ Prudent (EV)</option><option value="0.1">⚖️ Équilibré</option><option value="0.2">🔥 Agressif</option><option value="0.4">🚀 All-in</option></select></div>`+
+       `<select id="braquetSel" class="bsel" style="flex:none;width:auto"><option value="grignoter">🐜 Grignoter (remonter)</option><option value="cible">🎯 Mode Gagner (1ʳᵉ place)</option><option value="0">🛡️ Prudent (EV)</option><option value="0.1">⚖️ Équilibré</option><option value="0.2">🔥 Agressif</option><option value="0.4">🚀 All-in</option></select></div>`+
        `<div id="recoOut" class="note">Lance le calcul : je simule la fin du tournoi des milliers de fois et je classe tes options par <b>probabilité de doubler le leader</b>.</div></div>`;
     // saisie pronos
     h+=`<div style="margin-top:12px"><div class="kv"><span>Saisir les pronos (le tien + ceux des autres une fois visibles)</span><span></span></div>`;
@@ -764,9 +764,9 @@ function wireDetail(m,G){
   const wb=$('winBtn');
   if(wb) wb.onclick=()=>runWin(m,G);
   const bsel=$('braquetSel');
-  if(bsel){ bsel.value=String(braquet); bsel.onchange=()=>{ braquet=(bsel.value==='cible'?'cible':+bsel.value); runWin(m,G); }; }
+  if(bsel){ bsel.value=String(braquet); bsel.onchange=()=>{ braquet=(bsel.value==='cible'||bsel.value==='grignoter')?bsel.value:+bsel.value; runWin(m,G); }; }
 }
-const BRAQUET_LBL={'cible':'Mode Gagner (auto)','0':'Prudent (EV)','0.1':'Équilibré','0.2':'Agressif','0.4':'All-in'};
+const BRAQUET_LBL={'grignoter':'Grignoter','cible':'Mode Gagner (auto)','0':'Prudent (EV)','0.1':'Équilibré','0.2':'Agressif','0.4':'All-in'};
 const WIN_DOSES=[0,0.08,0.12,0.18,0.28];   // doses de variance du "futur moi" testées par le mode auto
 function runWin(m,G){
   $('recoOut').innerHTML='⏳ Simulation en cours…';
@@ -776,6 +776,26 @@ function runWin(m,G){
     const remaining=MATCHES.filter(x=>!x.res).length;
     const styleR=playerStyle(); const lp=behind?projectPick(leadR.p,G,styleR):null;
     const evp=bestEV(G).pred; const cible=(String(braquet)==='cible'); const key=p=>p[0]+'-'+p[1];
+    // ===== Mode Grignoter : score le plus probable (chasse l'exact), cible = passer le joueur juste devant =====
+    if(String(braquet)==='grignoter'){
+      let mod=[0,0],mp=-1; for(let i=0;i<=6;i++)for(let j=0;j<=6;j++){ if(G.g[i][j]>mp){mp=G.g[i][j];mod=[i,j];} }
+      const above=st0.filter(r=>r.pts>meR.pts).sort((a,b)=>a.pts-b.pts)[0];
+      const exactP=100*mp, isDraw=mod[0]===mod[1], sameEV=(mod[0]===evp[0]&&mod[1]===evp[1]);
+      let h=`<div class="big">${mod[0]} – ${mod[1]}</div>`;
+      h+=`<div class="note">🐜 <b>Grignoter</b> — le <b>score le plus probable</b> (chasse l'exact). Il tombe à <b style="color:var(--gold)">${exactP.toFixed(1)}%</b> · 1N2 ${(100*G.pH).toFixed(0)}/${(100*G.pD).toFixed(0)}/${(100*G.pA).toFixed(0)}.</div>`;
+      h+=`<div class="note">Tu es <b>${meR.pos}ᵉ</b> (${meR.pts} pts). ${above?`Cible : <b>passer ${above.p.split('_')[0]}</b> (${above.pts} pts, +${above.pts-meR.pts}).`:`Tu es en tête 🎉`}</div>`;
+      let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi ${key(mod)} ?</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
+      why+=`<li>C'est le score le <b>plus probable</b> du match (${exactP.toFixed(1)}%)${isDraw?` — un <b>nul</b> : sur un match serré c'est souvent le score n°1, et ce tournoi en regorge`:''}. On vise le <b>4-points (exact)</b>, pas la tendance à 2.</li>`;
+      if(!sameEV) why+=`<li>L'EV « safe » jouerait <b>${key(evp)}</b> (${expPoints(evp,G).toFixed(2)} pts espérés) : plus régulier mais il <b>rate les exacts</b>. Backtest : chasser l'exact a fait <b>4 exacts / 38 pts</b> vs 2 / 36 en EV.</li>`;
+      else why+=`<li>Ici le plus probable = l'EV : aucun dilemme, joue <b>${key(mod)}</b>.</li>`;
+      why+=`<li><b>Et colmate la fuite</b> : joue ce pick, pas un score d'instinct. Jouer le modèle te remet déjà dans le peloton (~+8 pts).</li>`;
+      why+=`</ul></div>`;
+      h+=why;
+      h+=`<div class="note">Mode Grignoter (remonter le peloton). « Prudent (EV) » = plus régulier ; « Mode Gagner » = variance pour viser la 1ʳᵉ place.</div>`;
+      lastReco={ id:m.id, html:h };
+      $('recoOut').innerHTML=h;
+      return;
+    }
     const pickFor=d=>(d>0&&lp)?catchUpPick(G,lp,d):evp;
     // baseline "safe" : le futur moi joue EV (dose 0)
     reseed(SIM_SEED); const safe=winSim(m,[evp],1200,0)[0];
