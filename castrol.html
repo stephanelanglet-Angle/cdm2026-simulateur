@@ -776,22 +776,20 @@ function runWin(m,G){
     const remaining=MATCHES.filter(x=>!x.res).length;
     const styleR=playerStyle(); const lp=behind?projectPick(leadR.p,G,styleR):null;
     const evp=bestEV(G).pred; const cible=(String(braquet)==='cible'); const key=p=>p[0]+'-'+p[1];
-    // ===== Mode Grignoter : score le plus probable (chasse l'exact), cible = passer le joueur juste devant =====
+    // ===== Mode Grignoter : pick EV (max de points, robuste) — remonter le peloton, anti-réflexe-nul =====
     if(String(braquet)==='grignoter'){
-      let mod=[0,0],mp=-1; for(let i=0;i<=6;i++)for(let j=0;j<=6;j++){ if(G.g[i][j]>mp){mp=G.g[i][j];mod=[i,j];} }
       const above=st0.filter(r=>r.pts>meR.pts).sort((a,b)=>a.pts-b.pts)[0];
-      const exactP=100*mp, isDraw=mod[0]===mod[1], sameEV=(mod[0]===evp[0]&&mod[1]===evp[1]);
-      let h=`<div class="big">${mod[0]} – ${mod[1]}</div>`;
-      h+=`<div class="note">🐜 <b>Grignoter</b> — le <b>score le plus probable</b> (chasse l'exact). Il tombe à <b style="color:var(--gold)">${exactP.toFixed(1)}%</b> · 1N2 ${(100*G.pH).toFixed(0)}/${(100*G.pD).toFixed(0)}/${(100*G.pA).toFixed(0)}.</div>`;
+      const exactP=100*G.g[evp[0]][evp[1]]; const isDraw=evp[0]===evp[1];
+      let h=`<div class="big">${evp[0]} – ${evp[1]}</div>`;
+      h+=`<div class="note">🐜 <b>Grignoter</b> — le <b>pick optimal du modèle</b> (max de points, robuste). <b style="color:var(--gold)">${expPoints(evp,G).toFixed(2)} pts espérés</b> · exact à ${exactP.toFixed(0)}% · 1N2 ${(100*G.pH).toFixed(0)}/${(100*G.pD).toFixed(0)}/${(100*G.pA).toFixed(0)}.</div>`;
       h+=`<div class="note">Tu es <b>${meR.pos}ᵉ</b> (${meR.pts} pts). ${above?`Cible : <b>passer ${above.p.split('_')[0]}</b> (${above.pts} pts, +${above.pts-meR.pts}).`:`Tu es en tête 🎉`}</div>`;
-      let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi ${key(mod)} ?</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
-      why+=`<li>C'est le score le <b>plus probable</b> du match (${exactP.toFixed(1)}%)${isDraw?` — un <b>nul</b> : sur un match serré c'est souvent le score n°1, et ce tournoi en regorge`:''}. On vise le <b>4-points (exact)</b>, pas la tendance à 2.</li>`;
-      if(!sameEV) why+=`<li>L'EV « safe » jouerait <b>${key(evp)}</b> (${expPoints(evp,G).toFixed(2)} pts espérés) : plus régulier mais il <b>rate les exacts</b>. Backtest : chasser l'exact a fait <b>4 exacts / 38 pts</b> vs 2 / 36 en EV.</li>`;
-      else why+=`<li>Ici le plus probable = l'EV : aucun dilemme, joue <b>${key(mod)}</b>.</li>`;
-      why+=`<li><b>Et colmate la fuite</b> : joue ce pick, pas un score d'instinct. Jouer le modèle te remet déjà dans le peloton (~+8 pts).</li>`;
+      let why=`<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><b>🧠 Pourquoi ${key(evp)} ?</b><ul style="margin:6px 0 0 18px;font-size:13px;line-height:1.55">`;
+      why+=`<li>C'est le score qui <b>maximise tes points</b> sur ce match (tendance/écart/exact pondérés). ${isDraw?`Ici le modèle voit bien un <b>nul</b> le plus payant.`:`Le modèle joue le <b>favori</b> — ⚠️ <b>ne le transforme pas en 1-1 d'instinct</b>.`}</li>`;
+      why+=`<li><b>La règle, point final</b> : tu recopies CE score. Le réflexe « nul » t'a coûté <b>13 pts</b> de fuite (jouer 1-1 sur des matchs de favori = 0). Joue le modèle = tu remontes dans le peloton.</li>`;
+      why+=`<li>Tu veux la 1ʳᵉ place coûte que coûte ? Passe en <b>« Mode Gagner »</b> (variance assumée). Pour <b>grignoter régulièrement</b>, reste ici.</li>`;
       why+=`</ul></div>`;
       h+=why;
-      h+=`<div class="note">Mode Grignoter (remonter le peloton). « Prudent (EV) » = plus régulier ; « Mode Gagner » = variance pour viser la 1ʳᵉ place.</div>`;
+      h+=`<div class="note">Mode Grignoter (remonter le peloton) — le pick EV, sans gambler. « Mode Gagner » = variance pour viser la 1ʳᵉ.</div>`;
       lastReco={ id:m.id, html:h };
       $('recoOut').innerHTML=h;
       return;
