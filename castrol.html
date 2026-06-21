@@ -306,16 +306,48 @@ buildMatches();
 // Résultats bonus RÉELS, saisis au fil du tournoi (les vainqueurs de groupe sont auto-calculés).
 let BONUS_ACTUAL = { semis:[null,null,null,null], champ:null, tor:null, gw:{} };
 
-// Classement d'un groupe (si les 6 matchs sont joués) -> équipes triées (pts > diff > marqués)
+// ===== Classement d'un groupe selon les règles FIFA 2026 (Art. 13) =====
+// points -> [confrontation directe : a) pts b) diff c) buts, RÉAPPLIQUÉE au sous-groupe encore à égalité]
+//        -> diff. générale -> buts généraux -> (fair-play : pas de données) -> classement FIFA (proxy = Elo).
+// Aucun tirage au sort en 2026 ; l'Elo étant unique, le départage est entièrement DÉTERMINISTE.
+// `ms` = matchs du groupe avec {home, away, res} (res = score réel OU simulé selon l'appelant).
+function fifaRankGroup(teams, ms){
+  const elo=tm=>(ELO[tm]||1700), gd=o=>o.gf-o.ga;
+  function build(sub){ const s={}; sub.forEach(tm=>s[tm]={team:tm,pts:0,gf:0,ga:0});
+    ms.forEach(m=>{ if(!m.res)return; if(sub.indexOf(m.home)<0||sub.indexOf(m.away)<0)return; const a=m.res[0],b=m.res[1];
+      s[m.home].gf+=a;s[m.home].ga+=b;s[m.away].gf+=b;s[m.away].ga+=a;
+      if(a>b)s[m.home].pts+=3; else if(b>a)s[m.away].pts+=3; else {s[m.home].pts++;s[m.away].pts++;} });
+    return s; }
+  const ov=build(teams);
+  function resolveTie(block){   // block = équipes à égalité de points
+    if(block.length===1) return block.slice();
+    const h=build(block);       // Étape 1 : stats en confrontation directe (matchs entre ces équipes)
+    const ranked=block.slice().sort((a,b)=> h[b].pts-h[a].pts || gd(h[b])-gd(h[a]) || h[b].gf-h[a].gf);
+    const out=[]; let i=0;
+    while(i<ranked.length){
+      let j=i; while(j+1<ranked.length && h[ranked[j+1]].pts===h[ranked[i]].pts && gd(h[ranked[j+1]])===gd(h[ranked[i]]) && h[ranked[j+1]].gf===h[ranked[i]].gf) j++;
+      const sub=ranked.slice(i,j+1);
+      if(sub.length===1) out.push(sub[0]);
+      else if(sub.length<block.length) resolveTie(sub).forEach(x=>out.push(x));   // réapplique a-c au sous-groupe restant
+      else sub.slice().sort((a,b)=> gd(ov[b])-gd(ov[a]) || ov[b].gf-ov[a].gf || elo(b)-elo(a)).forEach(x=>out.push(x)); // Étape 2 (diff/buts généraux) + Étape 3 (Elo)
+      i=j+1;
+    }
+    return out;
+  }
+  const byPts=teams.slice().sort((a,b)=> ov[b].pts-ov[a].pts);
+  const order=[]; let i=0;
+  while(i<byPts.length){
+    let j=i; while(j+1<byPts.length && ov[byPts[j+1]].pts===ov[byPts[i]].pts) j++;
+    const block=byPts.slice(i,j+1);
+    (block.length===1?block:resolveTie(block)).forEach(tm=>order.push(tm));
+    i=j+1;
+  }
+  return order.map(tm=>ov[tm]);   // tableau de stats {team,pts,gf,ga} trié selon FIFA 2026
+}
 function groupTable(g){
   const ms=MATCHES.filter(m=>m.g===g);
   if(ms.length<6 || ms.some(m=>!m.res)) return null;
-  const t={}; GROUPS[g].forEach(team=>t[team]={team,pts:0,gf:0,ga:0});
-  ms.forEach(m=>{ const [a,b]=m.res;
-    t[m.home].gf+=a; t[m.home].ga+=b; t[m.away].gf+=b; t[m.away].ga+=a;
-    if(a>b)t[m.home].pts+=3; else if(b>a)t[m.away].pts+=3; else { t[m.home].pts++; t[m.away].pts++; }
-  });
-  return Object.values(t).sort((x,y)=> y.pts-x.pts || (y.gf-y.ga)-(x.gf-x.ga) || y.gf-x.gf || x.team.localeCompare(y.team));
+  return fifaRankGroup(GROUPS[g], ms);
 }
 function actualGroupWinner(g){ const tb=groupTable(g); return tb? tb[0].team : null; }
 // vainqueur retenu pour le scoring : override manuel (BONUS_ACTUAL.gw) sinon auto-calculé depuis les matchs
@@ -601,14 +633,12 @@ function winSim(selMatch, candidates, nSims, meStrat){
     });
     // 2) classements de poule
     const SB={};
-    GL.forEach(g=>{ const t={}; GROUPS[g].forEach(tm=>t[tm]={team:tm,pts:0,gf:0,ga:0});
-      MATCHES.filter(m=>m.g===g).forEach(m=>{ const r=groupRes[m.n], a=r[0], b=r[1];
-        t[m.home].gf+=a;t[m.home].ga+=b;t[m.away].gf+=b;t[m.away].ga+=a;
-        if(a>b)t[m.home].pts+=3;else if(b>a)t[m.away].pts+=3;else{t[m.home].pts++;t[m.away].pts++;} });
-      SB[g]=Object.values(t).sort((x,y)=>y.pts-x.pts||(y.gf-y.ga)-(x.gf-x.ga)||y.gf-x.gf||(RNG()-.5));
+    GL.forEach(g=>{ const ms=MATCHES.filter(m=>m.g===g).map(m=>({home:m.home,away:m.away,res:groupRes[m.n]}));
+      SB[g]=fifaRankGroup(GROUPS[g], ms);   // classement FIFA 2026 (confrontation directe -> diff -> Elo)
     });
     // 3) 8 meilleurs 3es -> créneaux
-    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||(RNG()-.5)).slice(0,8).map(x=>x.g);
+    // meilleurs 3es : pas de confrontation directe (groupes différents) -> diff générale -> buts -> classement FIFA (Elo)
+    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
     const tA=assignThirds(best8);
     const thirdTeam={}; TS_MATCH.forEach((mn,si)=>{ const g=tA[si]||best8[si]; thirdTeam[mn]=SB[g][2].team; });
     // 4) phase finale
