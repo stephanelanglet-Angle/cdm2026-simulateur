@@ -95,9 +95,11 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 .brk-col .rnd{font-size:10.5px;color:var(--faint);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
 .brk-m{border:1px solid var(--line2);border-radius:8px;padding:5px 8px;background:var(--panel2)}
 .brk-m .mn{font-size:9px;color:var(--faint);font-family:var(--mono)}
-.brk-m .tm{font-size:12px;padding:1px 0;font-weight:600}
-.brk-m .tm.proj{font-style:italic;font-weight:500;opacity:.8}
+.brk-m .tm{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:1px 0;font-weight:600}
+.brk-m .tm.proj{font-style:italic;font-weight:500;opacity:.85}
 .brk-m .tm.third{color:var(--gold)}
+.brk-m .tm .pc{flex:none;color:var(--faint);font-weight:400;font-style:normal;font-family:var(--mono);font-size:10.5px}
+.brk-m .tm .pc.fav{color:var(--grass)}
 .brkleg{font-size:11px;color:var(--faint);line-height:1.5;margin-bottom:10px}
 .brkleg b{color:var(--chalk);font-weight:700}
 .brkleg .champ{color:var(--gold)}
@@ -973,22 +975,24 @@ function bracketData(){
   TS_MATCH.forEach((mn,si)=>{ const gg=tA[si]||best8[si]; thirdTeam[mn]=SB[gg]?SB[gg][2].team:null; });
   return {SB,complete,allComplete,thirdTeam};
 }
+function koWin(h,a){ const G=grid(h,a); return G.pH + G.pD*0.5; } // P(h se qualifie) selon le modèle ; match nul -> tirs au but 50/50
 function renderBracket(){
   const {SB,complete,allComplete,thirdTeam}=bracketData();
-  const teamAt={}, win={};   // teamAt[n]={a,b cellules} ; win[n]=équipe qui passe (favori Elo)
+  const teamAt={}, win={};
   const r32team=(s,mn)=>{ if(s[0]==='p'){ const g=s[2],pos=s[1]; return {t:SB[g]?SB[g][pos-1].team:null, conf:complete[g]}; }
     return {t:thirdTeam[mn]||null, conf:allComplete, third:true}; };   // 3e confirmé seulement quand TOUTES les poules sont finies
-  R32.forEach(mt=>{ const A=r32team(mt.a,mt.n), B=r32team(mt.b,mt.n);
-    teamAt[mt.n]={a:A,b:B}; win[mt.n]=(A.t&&B.t)?(effElo(A.t)>=effElo(B.t)?A.t:B.t):null; });
-  const adv=(mn,f1,f2)=>{ const a=win[f1]||null, b=win[f2]||null;   // vainqueurs KO = projection (jamais "confirmé")
-    teamAt[mn]={a:{t:a,conf:false},b:{t:b,conf:false}}; win[mn]=(a&&b)?(effElo(a)>=effElo(b)?a:b):null; };
+  function decide(mn,A,B){ let w=null;   // vainqueur projeté = plus forte proba du modèle
+    if(A.t&&B.t){ const pa=koWin(A.t,B.t), pb=1-pa; w=pa>=pb?A.t:B.t; A={...A,p:pa,fav:w===A.t}; B={...B,p:pb,fav:w===B.t}; }
+    teamAt[mn]={a:A,b:B}; win[mn]=w; }
+  R32.forEach(mt=>decide(mt.n, r32team(mt.a,mt.n), r32team(mt.b,mt.n)));
+  const adv=(mn,f1,f2)=>decide(mn, {t:win[f1]||null,conf:false}, {t:win[f2]||null,conf:false}); // vainqueurs KO = projection
   R16.forEach((p,i)=>adv(89+i,p[0],p[1])); QF.forEach((p,i)=>adv(97+i,p[0],p[1]));
   SF.forEach((p,i)=>adv(101+i,p[0],p[1])); adv(103,101,102);
-  const cell=c=>`<div class="tm ${c.conf?'':'proj'} ${c.third?'third':''}">${c.t||'—'}</div>`;
+  const cell=c=>`<div class="tm ${c.conf?'':'proj'} ${c.third?'third':''}"><span>${c.t||'—'}</span>${c.p!=null?`<span class="pc ${c.fav?'fav':''}">${Math.round(c.p*100)}%</span>`:''}</div>`;
   const card=mn=>{ const d=teamAt[mn]; return `<div class="brk-m"><div class="mn">M${mn}</div>${cell(d.a)}${cell(d.b)}</div>`; };
   const col=(title,ns)=>`<div class="brk-col"><div class="rnd">${title}</div>${ns.map(card).join('')}</div>`;
   const champ=win[103];
-  return '<div class="brkleg">Projection live d’après les classements actuels — vainqueurs KO = favori Elo. <b>Gras</b> = qualifié confirmé (poule finie), <i>italique</i> = provisoire.'+
+  return '<div class="brkleg">Projection live — qualifiés d’après les classements actuels, vainqueurs KO = <b>probabilité du modèle</b> (% = chance de passer ce tour, nul → tirs au but 50/50). <b>Gras</b> = qualifié confirmé (poule finie), <i>italique</i> = provisoire.'+
     (champ?` · Champion projeté : <b class="champ">${champ}</b>`:'')+'</div>'+
     '<div class="brk">'+col('32es',R16.flat())+col('8es',R16.map((_,i)=>89+i))+
     col('Quarts',QF.map((_,i)=>97+i))+col('Demies',SF.map((_,i)=>101+i))+col('Finale',[103])+'</div>';
