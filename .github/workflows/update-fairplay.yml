@@ -1,0 +1,35 @@
+name: Maj fair-play (cartons, Wikipedia)
+
+# Met a jour fairplay.json (points discipline Art.13 par equipe) toutes les 2h.
+# Critere de departage des groupes (fair-play, avant le classement FIFA).
+# Declenchable a la main (onglet Actions -> Run workflow).
+on:
+  schedule:
+    # Toutes les 2h, minute decalee (pas a l'heure ronde : creneau congestionne chez GitHub).
+    - cron: '17 */2 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Recuperer les cartons
+        run: node scripts/update-fairplay.mjs
+      - name: Committer si changement
+        run: |
+          if [ -n "$(git status --porcelain fairplay.json)" ]; then
+            git config user.name "fairplay-bot"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add fairplay.json
+            git commit -m "chore: maj fair-play cartons ($(date -u +%Y-%m-%d))"
+            git push
+          else
+            echo "Aucun changement fair-play."
+          fi

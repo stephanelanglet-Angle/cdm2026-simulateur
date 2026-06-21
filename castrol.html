@@ -306,10 +306,15 @@ buildMatches();
 // Résultats bonus RÉELS, saisis au fil du tournoi (les vainqueurs de groupe sont auto-calculés).
 let BONUS_ACTUAL = { semis:[null,null,null,null], champ:null, tor:null, gw:{} };
 
+// Données de départage chargées au démarrage : fair-play (cartons, Wikipédia) + classement FIFA (fifa.json).
+let FAIRPLAY={}, FIFA_PTS={};
+function fairScore(tm){ return FAIRPLAY[tm]!=null ? FAIRPLAY[tm] : 0; } // points discipline (≤ 0) ; plus proche de 0 = mieux
+function fifaScore(tm){ return FIFA_PTS[tm]||0; }                       // points classement FIFA ; plus haut = mieux
+
 // ===== Classement d'un groupe selon les règles FIFA 2026 (Art. 13) =====
 // points -> [confrontation directe : a) pts b) diff c) buts, RÉAPPLIQUÉE au sous-groupe encore à égalité]
-//        -> diff. générale -> buts généraux -> (fair-play : pas de données) -> classement FIFA (proxy = Elo).
-// Aucun tirage au sort en 2026 ; l'Elo étant unique, le départage est entièrement DÉTERMINISTE.
+//        -> diff. générale -> buts généraux -> fair-play (cartons) -> classement FIFA (Elo en ultime secours).
+// Aucun tirage au sort en 2026 ; le départage est entièrement DÉTERMINISTE.
 // `ms` = matchs du groupe avec {home, away, res} (res = score réel OU simulé selon l'appelant).
 function fifaRankGroup(teams, ms){
   const elo=tm=>(ELO[tm]||1700), gd=o=>o.gf-o.ga;
@@ -329,7 +334,7 @@ function fifaRankGroup(teams, ms){
       const sub=ranked.slice(i,j+1);
       if(sub.length===1) out.push(sub[0]);
       else if(sub.length<block.length) resolveTie(sub).forEach(x=>out.push(x));   // réapplique a-c au sous-groupe restant
-      else sub.slice().sort((a,b)=> gd(ov[b])-gd(ov[a]) || ov[b].gf-ov[a].gf || elo(b)-elo(a)).forEach(x=>out.push(x)); // Étape 2 (diff/buts généraux) + Étape 3 (Elo)
+      else sub.slice().sort((a,b)=> gd(ov[b])-gd(ov[a]) || ov[b].gf-ov[a].gf || fairScore(b)-fairScore(a) || fifaScore(b)-fifaScore(a) || elo(b)-elo(a)).forEach(x=>out.push(x)); // Étape 2 (diff/buts) + f) fair-play + Étape 3 (FIFA, Elo en secours)
       i=j+1;
     }
     return out;
@@ -638,7 +643,7 @@ function winSim(selMatch, candidates, nSims, meStrat){
     });
     // 3) 8 meilleurs 3es -> créneaux
     // meilleurs 3es : pas de confrontation directe (groupes différents) -> diff générale -> buts -> classement FIFA (Elo)
-    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
+    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||fairScore(y.s.team)-fairScore(x.s.team)||fifaScore(y.s.team)-fifaScore(x.s.team)||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
     const tA=assignThirds(best8);
     const thirdTeam={}; TS_MATCH.forEach((mn,si)=>{ const g=tA[si]||best8[si]; thirdTeam[mn]=SB[g][2].team; });
     // 4) phase finale
@@ -1095,6 +1100,9 @@ fetch('elo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
     const el=document.getElementById('eloInfo'); if(el) el.textContent='Elo : eloratings.net, MAJ '+(d._updated||'?')+'.';
     renderAll(); }
 }).catch(()=>{});
+// Classement FIFA officiel (départage ultime) + fair-play (cartons) — alimentés par les crons GitHub Actions.
+fetch('fifa.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.fifa){ const m={}; for(const k in d.fifa) m[k]=d.fifa[k].points; FIFA_PTS=m; renderAll(); } }).catch(()=>{});
+fetch('fairplay.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.points){ const m={}; for(const en in d.points) m[EN2FR[en]||en]=d.points[en]; FAIRPLAY=m; renderAll(); } }).catch(()=>{});
 const savedCode=localStorage.getItem(CODE_KEY);
 if(savedCode) connect(savedCode); else setSync('Sync désactivée — clique sur ☁️');
 </script>
