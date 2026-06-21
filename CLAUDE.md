@@ -10,6 +10,8 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 - `castrol.html` — stratège de pronos pour le concours « Castrol Legends » (9 joueurs). Lit les params/Elo de la régie ; même origine → partage le localStorage.
 - `scripts/update-elo.mjs` + `.github/workflows/update-elo.yml` — maj Elo quotidienne depuis eloratings.net → `elo.json` (racine).
 - `elo.json` — `{_source, _updated, elo:{48 équipes}}`, lu par les 2 pages au chargement.
+- `scripts/update-fairplay.mjs` + `update-fairplay.yml` — **toutes les 2h** : table « Discipline » de Wikipédia (1 page/groupe) → `fairplay.json` `{points:{équipe EN: score Art.13 ≤ 0}}`. Critère de fair-play du départage.
+- `scripts/update-fifaranking.mjs` + `update-fifaranking.yml` — **quotidien** : API officielle `inside.fifa.com/api/ranking-overview` → `fifa.json` `{fifa:{équipe FR:{rank,points}}}`. Critère ultime de départage.
 
 ## Modèle (identique dans les 3 livrables)
 - `sup = (eloA - eloB) / DIV_GOALS` ; `λ = [(MU_TOTAL + sup)/2, (MU_TOTAL - sup)/2]` ; buts ~ Poisson(λ).
@@ -40,6 +42,10 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 - Saisie des pronos : `detailBusy()` (garde 4 s + focus) empêche un push de synchro d'un autre appareil de ré-rendre `renderDetail` et d'effacer la frappe en cours. Ne pas reconstruire le panneau pendant la saisie.
 - L'Action GitHub exige « Read and write permissions » (Settings → Actions) — déjà activé.
 - Bracket KO (matchs 73-104) : la sim les **projette** mais ils ne sont pas encore saisissables dans l'UI.
+- **Départage des groupes (Art.13 FIFA 2026)** : `fifaRankGroup()` (castrol) = pts → confrontation directe (a/b/c, **récursive** sur le sous-groupe à égalité) → diff générale → buts généraux → **fair-play** (`fairScore`/`fairplay.json`) → **classement FIFA** (`fifaScore`/`fifa.json`) → Elo (ultime secours). Aucun tirage au sort, 100 % déterministe. Même chaîne pour les 8 meilleurs 3es (`best8`). Helpers globaux `fairScore(tm)` / `fifaScore(tm)`.
+- **Codes FIFA ≠ eloratings** : `update-fifaranking.mjs` mappe nos 48 noms FR → code FIFA 3 lettres maison (GER, NED, POR, CRO, SUI, USA, SCO, KSA, RSA, CIV, CUW, COD…), ≠ codes eloratings (DE, NL, US, SQ…). Garde-fou : points < 1100 ⇒ mauvais code.
+- **Fair-play Wikipédia** (`update-fairplay.mjs`) : la colonne « Score » des pages `2026_FIFA_World_Cup_Group_X` est **déjà** au barème Art.13 (≤ 0). Pièges de parsing : titre « national **soccer** team » (USA/RSA) ET « football team » ; « **men's** » dans le titre (USA/Canada) ; cellule Score = `<th>` pas `<td>` (prendre la **dernière** cellule td|th) ; tiret unicode U+2212. `fairplay.json` keyé EN → l'app reconvertit via `EN2FR`. Équipe absente = 0 carton (meilleur).
+- **Table des 3es (FIFA 2026)** : `TS_MATCH=[74,77,79,80,81,82,85,87]` + `TS_ELIG` **vérifiés conformes** à la table officielle (un 3e affronte toujours un 1er, sur ces 8 créneaux). `assignThirds` (couplage Kuhn) donne une affectation **valide** mais pas forcément l'**exacte** des 495 combinaisons (Annexe C, Wikipédia `Template:2026_FIFA_World_Cup_third-place_table`) — raffinement non fait.
 
 ## Calibrage auto des 3 paramètres
 - **Castrol** ré-estime `hostBonus/divGoals/muTotal` depuis les **scores observés** par MAP : NLL de Poisson + pénalité gaussienne ancrée sur 60/300/2,70 (peu de matchs ⇒ proche des défauts ; au fil du tournoi ⇒ piloté par les données). Fonction `calibrate()` + carte « Calibrage tournoi » (suggestion + toggle auto).
@@ -57,6 +63,7 @@ Repo : `stephanelanglet-Angle/cdm2026-simulateur` → https://stephanelanglet-an
 
 ## Reste à faire
 - UI de saisie des matchs à élimination directe (n°73-104), quand le bracket se matérialise après les poules.
+- **Affectation exacte des 3es** : embarquer la table officielle des 495 combinaisons (Annexe C / `Template:2026_FIFA_World_Cup_third-place_table`) pour remplacer le couplage Kuhn de `assignThirds` (aujourd'hui : affectation valide mais pas toujours l'officielle).
 - Couche d'ajustement Elo manuel (blessures/météo), par-dessus l'auto eloratings.
 - ~~Niveau d'audace réglable~~ → fait (braquet, cf. « Stratégie de reco »).
 - Calibrage auto : `calibAuto` par défaut OFF (mode suggestion) ; l'utilisateur active l'auto dans Castrol. Limite v1 : si la régie sauvegarde pendant que l'auto est ON, les params calibrés deviennent le « manuel » persisté (pas de baseline manuel séparé). Curseurs régie : pas grossiers (hôte ±10, div ±10, μ ±0,05) ⇒ le thumb se cale sur le cran, le libellé porte la valeur exacte.
