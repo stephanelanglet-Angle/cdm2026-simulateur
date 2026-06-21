@@ -303,7 +303,7 @@ function buildMatches(){
 buildMatches();
 
 // Résultats bonus RÉELS, saisis au fil du tournoi (les vainqueurs de groupe sont auto-calculés).
-let BONUS_ACTUAL = { semis:[null,null,null,null], champ:null, tor:null };
+let BONUS_ACTUAL = { semis:[null,null,null,null], champ:null, tor:null, gw:{} };
 
 // Classement d'un groupe (si les 6 matchs sont joués) -> équipes triées (pts > diff > marqués)
 function groupTable(g){
@@ -317,12 +317,19 @@ function groupTable(g){
   return Object.values(t).sort((x,y)=> y.pts-x.pts || (y.gf-y.ga)-(x.gf-x.ga) || y.gf-x.gf || x.team.localeCompare(y.team));
 }
 function actualGroupWinner(g){ const tb=groupTable(g); return tb? tb[0].team : null; }
+// vainqueur retenu pour le scoring : override manuel (BONUS_ACTUAL.gw) sinon auto-calculé depuis les matchs
+function groupWinner(g){ return (BONUS_ACTUAL.gw && BONUS_ACTUAL.gw[g]) || actualGroupWinner(g); }
+function groupWinnerSelect(g){
+  const cur=(BONUS_ACTUAL.gw&&BONUS_ACTUAL.gw[g])||''; const auto=actualGroupWinner(g);
+  return `<select class="gwsel" data-g="${g}"><option value="">${auto?'auto ✓ '+auto:'auto'}</option>`+
+    (GROUPS[g]||[]).map(t=>`<option value="${t}" ${t===cur?'selected':''}>${t}</option>`).join('')+`</select>`;
+}
 
 // Points bonus d'un joueur (4 par bonne réponse)
 function bonusBreakdown(pl){
   const bp=BONUS_PICKS[pl]; const out={gw:0,df:0,champ:0,tor:0,total:0,detail:[]};
   if(!bp) return out;
-  Object.keys(GROUPS).forEach(g=>{ const w=actualGroupWinner(g); if(w && bp.gw && bp.gw[g]===w){ out.gw+=BONUS_PT; out.detail.push('vainqueur Gr '+g); } });
+  Object.keys(GROUPS).forEach(g=>{ const w=groupWinner(g); if(w && bp.gw && bp.gw[g]===w){ out.gw+=BONUS_PT; out.detail.push('vainqueur Gr '+g); } });
   (BONUS_ACTUAL.semis||[]).filter(Boolean).forEach(team=>{ if(bp.df && bp.df.includes(team)){ out.df+=BONUS_PT; out.detail.push('demi: '+team); } });
   if(BONUS_ACTUAL.champ && bp.champ===BONUS_ACTUAL.champ){ out.champ+=BONUS_PT; out.detail.push('champion'); }
   if(BONUS_ACTUAL.tor && bp.tor===BONUS_ACTUAL.tor){ out.tor+=BONUS_PT; out.detail.push('meilleur buteur'); }
@@ -856,8 +863,10 @@ function teamSelect(k, val, ph){
 }
 function renderBonus(){
   // résultats bonus réels
-  const gwLine = Object.keys(GROUPS).sort().map(g=>{ const w=actualGroupWinner(g); return `${g}:<b style="color:${w?'var(--grass)':'var(--faint)'}">${w||'—'}</b>`; }).join('  ');
-  let box=`<div class="note">Vainqueurs de groupe (auto dès qu'un groupe est terminé) : <span class="mono">${gwLine}</span></div>`;
+  // vainqueurs de groupe : saisie/override manuel (sinon auto-calculé depuis les matchs joués)
+  let box=`<div class="note"><b>Vainqueurs de groupe</b> <small style="color:var(--faint)">(« auto » = calculé depuis les matchs ; choisis une équipe pour forcer le vainqueur officiel, ex. départage)</small>`+
+    `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px">`+
+    Object.keys(GROUPS).sort().map(g=>`<span style="font-family:var(--mono);font-size:12px;white-space:nowrap"><b>${g}</b> ${groupWinnerSelect(g)}</span>`).join('')+`</div></div>`;
   box+=`<div class="note" style="margin-top:8px;color:var(--chalk)"><b>Demi-finalistes</b> : `+
     [0,1,2,3].map(i=>teamSelect('semi'+i, BONUS_ACTUAL.semis[i]||'', 'demi '+(i+1))).join(' ')+`</div>`;
   box+=`<div class="note" style="margin-top:6px;color:var(--chalk)"><b>Champion</b> : ${teamSelect('champ', BONUS_ACTUAL.champ||'', 'champion')}`+
@@ -867,6 +876,11 @@ function renderBonus(){
     const k=sel.dataset.k, v=sel.value||null;
     if(k.indexOf('semi')===0){ BONUS_ACTUAL.semis[+k.slice(4)]=v; }
     else if(k==='champ'){ BONUS_ACTUAL.champ=v; } else if(k==='tor'){ BONUS_ACTUAL.tor=v; }
+    saveLocal(); cloudMaybePush(); renderStandings(); renderBonus();
+  });
+  $('bonusActualBox').querySelectorAll('.gwsel').forEach(sel=>sel.onchange=()=>{
+    if(!BONUS_ACTUAL.gw) BONUS_ACTUAL.gw={};
+    BONUS_ACTUAL.gw[sel.dataset.g]=sel.value||null;
     saveLocal(); cloudMaybePush(); renderStandings(); renderBonus();
   });
   // table des pronos bonus de chaque joueur + B
@@ -937,7 +951,8 @@ function applyState(s){
   // NB : un résultat sauvegardé écrase le calendrier ; un résultat ABSENT du save garde le score officiel
   //      câblé dans SCHEDULE (sinon les matchs bakés 9-12 seraient effacés par un vieux state).
   if(s.bonus){ BONUS_ACTUAL = { semis: Array.isArray(s.bonus.semis)? s.bonus.semis.slice(0,4) : [null,null,null,null],
-    champ: s.bonus.champ||null, tor: s.bonus.tor||null };
+    champ: s.bonus.champ||null, tor: s.bonus.tor||null,
+    gw: (s.bonus.gw && typeof s.bonus.gw==='object') ? s.bonus.gw : {} };
     while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
   return true;
 }
