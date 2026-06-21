@@ -74,6 +74,30 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 .pgnav a{padding:8px 16px;border-radius:8px;font-weight:700;font-size:13.5px;color:var(--muted);text-decoration:none;white-space:nowrap}
 .pgnav a.on{background:var(--grass);color:#08160e}
 .pgnav a:not(.on):hover{color:var(--chalk)}
+/* Groupes & tableau final */
+#koTabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.gtables{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.gtbl{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2)}
+.gtbl h3{font-size:13px;padding:6px 10px;border-bottom:1px solid var(--line);letter-spacing:.4px}
+.gtbl h3 small{color:var(--faint);font-weight:400;font-size:11px;margin-left:6px}
+.gtbl table{font-size:12px}
+.gtbl th,.gtbl td{padding:4px 5px;border-bottom:1px solid var(--line)}
+.gtbl tbody tr:last-child td{border-bottom:none}
+.gtbl .nm{font-weight:600}
+.gtbl tr.q .nm{color:var(--grass)}
+.gtbl tr.q3 .nm{color:var(--gold)}
+.gtbl tr.out .nm,.gtbl tr.out td{color:var(--faint)}
+.qbadge{font-size:9px;font-family:var(--mono);border-radius:4px;padding:0 4px;margin-left:5px;vertical-align:middle}
+.qbadge.q{background:#16352A;color:var(--grass);border:1px solid var(--line2)}
+.qbadge.q3{background:#3a3320;color:var(--gold);border:1px solid var(--line2)}
+.brk{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px}
+.brk-col{flex:0 0 162px;display:flex;flex-direction:column;gap:7px}
+.brk-col .rnd{font-size:10.5px;color:var(--faint);font-family:var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px}
+.brk-m{border:1px solid var(--line2);border-radius:8px;padding:5px 8px;background:var(--panel2)}
+.brk-m .mn{font-size:9px;color:var(--faint);font-family:var(--mono)}
+.brk-m .tm{font-size:12px;padding:1px 0;font-weight:600}
+.brk-m .tm.ph{color:var(--faint);font-weight:400;font-family:var(--mono)}
+.brk-m .tm.third{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -108,6 +132,12 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
     <div class="mlist" id="matchList"></div>
   </div>
   <div class="card" id="detail"><div class="note">Sélectionne un match à gauche.</div></div>
+</div>
+
+<div class="card" id="koCard">
+  <h2>Groupes &amp; tableau final <small id="koCtx"></small></h2>
+  <div id="koTabs"></div>
+  <div id="koView"></div>
 </div>
 
 <div class="card">
@@ -895,9 +925,81 @@ function bonusBusy(){   // ne pas reconstruire le bloc Bonus pendant qu'un menu 
   const ae=document.activeElement, a=document.getElementById('bonusActualBox'), e=document.getElementById('bonusEditBox');
   return (ae && ((a&&a.contains(ae))||(e&&e.contains(ae)))) || (Date.now()-lastBonusInput < 4000);
 }
+// ===== Classements de groupes (live) + tableau final (bracket) =====
+let koTab='groups';
+function groupStandings(g){
+  const teams=GROUPS[g], st={}; teams.forEach(t=>st[t]={team:t,J:0,W:0,D:0,L:0,gf:0,ga:0,pts:0});
+  const ms=MATCHES.filter(m=>m.g===g);
+  ms.forEach(m=>{ if(!m.res)return; const a=m.res[0],b=m.res[1],H=st[m.home],A=st[m.away];
+    H.J++;A.J++;H.gf+=a;H.ga+=b;A.gf+=b;A.ga+=a;
+    if(a>b){H.W++;A.L++;H.pts+=3;} else if(b>a){A.W++;H.L++;A.pts+=3;} else {H.D++;A.D++;H.pts++;A.pts++;} });
+  const played=ms.filter(m=>m.res).length, complete=(played===6);
+  const order = complete
+    ? fifaRankGroup(teams, ms.map(m=>({home:m.home,away:m.away,res:m.res}))).map(o=>o.team)   // ordre exact Art.13
+    : teams.slice().sort((x,y)=> st[y].pts-st[x].pts || (st[y].gf-st[y].ga)-(st[x].gf-st[x].ga) || st[y].gf-st[x].gf || ((ELO[y]||1700)-(ELO[x]||1700)));
+  return {order, st, played, complete};
+}
+function renderGroupStandings(){
+  return '<div class="gtables">'+Object.keys(GROUPS).map(g=>{
+    const {order,st,played,complete}=groupStandings(g);
+    const rows=order.map((t,i)=>{ const s=st[t], diff=s.gf-s.ga;
+      const cls=i<2?'q':(i===2?'q3':'out');
+      const badge=i<2?'<span class="qbadge q">Q</span>':(i===2?'<span class="qbadge q3">3e</span>':'');
+      return `<tr class="${cls}"><td class="pos">${i+1}</td><td class="l"><span class="nm">${t}</span>${badge}</td>`+
+        `<td>${s.J}</td><td>${s.W}</td><td>${s.D}</td><td>${s.L}</td><td>${diff>0?'+':''}${diff}</td><td class="pts">${s.pts}</td></tr>`;
+    }).join('');
+    const stat=complete?'terminé':(played?('joués '+played+'/6'):'à venir');
+    return `<div class="gtbl"><h3>Groupe ${g} <small>${stat}</small></h3><table>`+
+      `<thead><tr><th class="pos"></th><th class="l">Équipe</th><th>J</th><th>G</th><th>N</th><th>P</th><th>Diff</th><th>Pts</th></tr></thead>`+
+      `<tbody>${rows}</tbody></table></div>`;
+  }).join('')+'</div>';
+}
+function bracketData(){
+  const GL=Object.keys(GROUPS), SB={}; let allComplete=true;
+  GL.forEach(g=>{ const ms=MATCHES.filter(m=>m.g===g);
+    if(ms.filter(m=>m.res).length===6) SB[g]=fifaRankGroup(GROUPS[g], ms.map(m=>({home:m.home,away:m.away,res:m.res})));
+    else allComplete=false; });
+  const thirdTeam={};
+  if(allComplete){
+    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||fairScore(y.s.team)-fairScore(x.s.team)||fifaScore(y.s.team)-fifaScore(x.s.team)||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
+    const combo=best8.slice().sort().join('');
+    const tA=(THIRDS_TABLE&&THIRDS_TABLE[combo])?THIRDS_TABLE[combo].split(''):assignThirds(best8);
+    TS_MATCH.forEach((mn,si)=>{ const gg=tA[si]||best8[si]; thirdTeam[mn]=SB[gg]?SB[gg][2].team:null; });
+  }
+  return {SB,thirdTeam};
+}
+function renderBracket(){
+  const {SB,thirdTeam}=bracketData();
+  const slot=(s,mn)=>{ if(s[0]==='p'){ const g=s[2],pos=s[1]; if(SB[g]) return {t:SB[g][pos-1].team,ph:false}; return {t:(pos===1?'1ᵉʳ ':'2ᵉ ')+g,ph:true}; }
+    const tt=thirdTeam[mn]; return tt?{t:tt,ph:false,third:true}:{t:'3ᵉ',ph:true,third:true}; };
+  const card=(mn,A,B)=>`<div class="brk-m"><div class="mn">M${mn}</div>`+
+    `<div class="tm ${A.ph?'ph':''} ${A.third?'third':''}">${A.t}</div>`+
+    `<div class="tm ${B.ph?'ph':''} ${B.third?'third':''}">${B.t}</div></div>`;
+  const win=n=>({t:'Vainq. M'+n,ph:true});
+  const r32map={}; R32.forEach(mt=>r32map[mt.n]=mt);
+  const colR32=R16.flat().map(n=>{ const mt=r32map[n]; return card(n,slot(mt.a,n),slot(mt.b,n)); }).join('');
+  const colR16=R16.map((p,i)=>card(89+i,win(p[0]),win(p[1]))).join('');
+  const colQF=QF.map((p,i)=>card(97+i,win(p[0]),win(p[1]))).join('');
+  const colSF=SF.map((p,i)=>card(101+i,win(p[0]),win(p[1]))).join('');
+  const colF=card(103,win(101),win(102));
+  return '<div class="brk">'+
+    `<div class="brk-col"><div class="rnd">32es</div>${colR32}</div>`+
+    `<div class="brk-col"><div class="rnd">8es</div>${colR16}</div>`+
+    `<div class="brk-col"><div class="rnd">Quarts</div>${colQF}</div>`+
+    `<div class="brk-col"><div class="rnd">Demies</div>${colSF}</div>`+
+    `<div class="brk-col"><div class="rnd">Finale</div>${colF}</div></div>`;
+}
+function renderKO(){
+  const tabs=[['groups','Classements'],['bracket','Tableau final']];
+  $('koTabs').innerHTML=tabs.map(([k,l])=>`<button class="gchip ${k===koTab?'on':''}" data-k="${k}">${l}</button>`).join('');
+  $('koTabs').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{koTab=b.dataset.k;renderKO();});
+  const nDone=Object.keys(GROUPS).filter(g=>groupStandings(g).complete).length;
+  $('koCtx').textContent=nDone+'/12 groupes terminés'+(nDone<12?' · le tableau final se complète à mesure que les poules s’achèvent':'');
+  $('koView').innerHTML = koTab==='groups'?renderGroupStandings():renderBracket();
+}
 function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
   if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
-  renderStyle(); if(!bonusBusy()) renderBonus(); renderCalib(); }
+  renderStyle(); if(!bonusBusy()) renderBonus(); renderCalib(); renderKO(); }
 
 const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
 function teamSelect(k, val, ph){
