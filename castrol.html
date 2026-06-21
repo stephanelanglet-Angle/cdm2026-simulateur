@@ -852,9 +852,14 @@ function detailBusy(){
   const focusedHere = ae && d && d.contains(ae) && /\bsc\b/.test(ae.className||'');
   return focusedHere || (Date.now()-lastDetailInput < 4000);   // saisie en cours ou très récente
 }
+let lastBonusInput=0;
+function bonusBusy(){   // ne pas reconstruire le bloc Bonus pendant qu'un menu déroulant est ouvert (sinon il se referme)
+  const ae=document.activeElement, b=document.getElementById('bonusActualBox');
+  return (ae && b && b.contains(ae)) || (Date.now()-lastBonusInput < 4000);
+}
 function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
   if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
-  renderStyle(); renderBonus(); renderCalib(); }
+  renderStyle(); if(!bonusBusy()) renderBonus(); renderCalib(); }
 
 const ALL_TEAMS = Object.keys(ELO).sort((a,b)=>a.localeCompare(b));
 function teamSelect(k, val, ph){
@@ -873,15 +878,21 @@ function renderBonus(){
     `  &nbsp; <b>Équipe du meilleur buteur</b> : ${teamSelect('tor', BONUS_ACTUAL.tor||'', 'équipe')}</div>`;
   $('bonusActualBox').innerHTML=box;
   $('bonusActualBox').querySelectorAll('.bsel').forEach(sel=>sel.onchange=()=>{
+    lastBonusInput=Date.now();
     const k=sel.dataset.k, v=sel.value||null;
     if(k.indexOf('semi')===0){ BONUS_ACTUAL.semis[+k.slice(4)]=v; }
     else if(k==='champ'){ BONUS_ACTUAL.champ=v; } else if(k==='tor'){ BONUS_ACTUAL.tor=v; }
     saveLocal(); cloudMaybePush(); renderStandings(); renderBonus();
   });
   $('bonusActualBox').querySelectorAll('.gwsel').forEach(sel=>sel.onchange=()=>{
+    lastBonusInput=Date.now();
     if(!BONUS_ACTUAL.gw) BONUS_ACTUAL.gw={};
     BONUS_ACTUAL.gw[sel.dataset.g]=sel.value||null;
     saveLocal(); cloudMaybePush(); renderStandings(); renderBonus();
+  });
+  // marque « occupé » dès qu'on ouvre/touche un menu -> la synchro ne reconstruit pas le bloc pendant la sélection
+  $('bonusActualBox').querySelectorAll('.bsel,.gwsel').forEach(sel=>{
+    ['focus','mousedown','touchstart'].forEach(ev=>sel.addEventListener(ev, ()=>{ lastBonusInput=Date.now(); }, {passive:true}));
   });
   // table des pronos bonus de chaque joueur + B
   let h='<thead><tr><th class="l">Joueur</th><th>Buteur</th><th>Demi-finalistes</th><th>Champion</th><th>Bonus (B)</th></tr></thead><tbody>';
