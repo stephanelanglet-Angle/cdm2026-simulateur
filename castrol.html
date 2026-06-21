@@ -96,8 +96,11 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 .brk-m{border:1px solid var(--line2);border-radius:8px;padding:5px 8px;background:var(--panel2)}
 .brk-m .mn{font-size:9px;color:var(--faint);font-family:var(--mono)}
 .brk-m .tm{font-size:12px;padding:1px 0;font-weight:600}
-.brk-m .tm.ph{color:var(--faint);font-weight:400;font-family:var(--mono)}
+.brk-m .tm.proj{font-style:italic;font-weight:500;opacity:.8}
 .brk-m .tm.third{color:var(--gold)}
+.brkleg{font-size:11px;color:var(--faint);line-height:1.5;margin-bottom:10px}
+.brkleg b{color:var(--chalk);font-weight:700}
+.brkleg .champ{color:var(--gold)}
 </style>
 </head>
 <body>
@@ -955,46 +958,47 @@ function renderGroupStandings(){
   }).join('')+'</div>';
 }
 function bracketData(){
-  const GL=Object.keys(GROUPS), SB={}; let allComplete=true;
-  GL.forEach(g=>{ const ms=MATCHES.filter(m=>m.g===g);
-    if(ms.filter(m=>m.res).length===6) SB[g]=fifaRankGroup(GROUPS[g], ms.map(m=>({home:m.home,away:m.away,res:m.res})));
-    else allComplete=false; });
+  // Projection CONTINUE : on classe chaque groupe avec son ordre actuel (exact Art.13 si terminé,
+  // sinon provisoire), même pour les poules en cours -> le tableau final se remplit en permanence.
+  const GL=Object.keys(GROUPS), SB={}, complete={};
+  GL.forEach(g=>{ const gs=groupStandings(g);
+    SB[g]=gs.order.map(t=>({team:t,pts:gs.st[t].pts,gf:gs.st[t].gf,ga:gs.st[t].ga}));
+    complete[g]=gs.complete; });
+  const allComplete=GL.every(g=>complete[g]);
+  // 8 meilleurs 3es d'après les 3es ACTUELS de chaque groupe
+  const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||fairScore(y.s.team)-fairScore(x.s.team)||fifaScore(y.s.team)-fifaScore(x.s.team)||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
+  const combo=best8.slice().sort().join('');
+  const tA=(THIRDS_TABLE&&THIRDS_TABLE[combo])?THIRDS_TABLE[combo].split(''):assignThirds(best8);
   const thirdTeam={};
-  if(allComplete){
-    const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||fairScore(y.s.team)-fairScore(x.s.team)||fifaScore(y.s.team)-fifaScore(x.s.team)||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
-    const combo=best8.slice().sort().join('');
-    const tA=(THIRDS_TABLE&&THIRDS_TABLE[combo])?THIRDS_TABLE[combo].split(''):assignThirds(best8);
-    TS_MATCH.forEach((mn,si)=>{ const gg=tA[si]||best8[si]; thirdTeam[mn]=SB[gg]?SB[gg][2].team:null; });
-  }
-  return {SB,thirdTeam};
+  TS_MATCH.forEach((mn,si)=>{ const gg=tA[si]||best8[si]; thirdTeam[mn]=SB[gg]?SB[gg][2].team:null; });
+  return {SB,complete,allComplete,thirdTeam};
 }
 function renderBracket(){
-  const {SB,thirdTeam}=bracketData();
-  const slot=(s,mn)=>{ if(s[0]==='p'){ const g=s[2],pos=s[1]; if(SB[g]) return {t:SB[g][pos-1].team,ph:false}; return {t:(pos===1?'1ᵉʳ ':'2ᵉ ')+g,ph:true}; }
-    const tt=thirdTeam[mn]; return tt?{t:tt,ph:false,third:true}:{t:'3ᵉ',ph:true,third:true}; };
-  const card=(mn,A,B)=>`<div class="brk-m"><div class="mn">M${mn}</div>`+
-    `<div class="tm ${A.ph?'ph':''} ${A.third?'third':''}">${A.t}</div>`+
-    `<div class="tm ${B.ph?'ph':''} ${B.third?'third':''}">${B.t}</div></div>`;
-  const win=n=>({t:'Vainq. M'+n,ph:true});
-  const r32map={}; R32.forEach(mt=>r32map[mt.n]=mt);
-  const colR32=R16.flat().map(n=>{ const mt=r32map[n]; return card(n,slot(mt.a,n),slot(mt.b,n)); }).join('');
-  const colR16=R16.map((p,i)=>card(89+i,win(p[0]),win(p[1]))).join('');
-  const colQF=QF.map((p,i)=>card(97+i,win(p[0]),win(p[1]))).join('');
-  const colSF=SF.map((p,i)=>card(101+i,win(p[0]),win(p[1]))).join('');
-  const colF=card(103,win(101),win(102));
-  return '<div class="brk">'+
-    `<div class="brk-col"><div class="rnd">32es</div>${colR32}</div>`+
-    `<div class="brk-col"><div class="rnd">8es</div>${colR16}</div>`+
-    `<div class="brk-col"><div class="rnd">Quarts</div>${colQF}</div>`+
-    `<div class="brk-col"><div class="rnd">Demies</div>${colSF}</div>`+
-    `<div class="brk-col"><div class="rnd">Finale</div>${colF}</div></div>`;
+  const {SB,complete,allComplete,thirdTeam}=bracketData();
+  const teamAt={}, win={};   // teamAt[n]={a,b cellules} ; win[n]=équipe qui passe (favori Elo)
+  const r32team=(s,mn)=>{ if(s[0]==='p'){ const g=s[2],pos=s[1]; return {t:SB[g]?SB[g][pos-1].team:null, conf:complete[g]}; }
+    return {t:thirdTeam[mn]||null, conf:allComplete, third:true}; };   // 3e confirmé seulement quand TOUTES les poules sont finies
+  R32.forEach(mt=>{ const A=r32team(mt.a,mt.n), B=r32team(mt.b,mt.n);
+    teamAt[mt.n]={a:A,b:B}; win[mt.n]=(A.t&&B.t)?(effElo(A.t)>=effElo(B.t)?A.t:B.t):null; });
+  const adv=(mn,f1,f2)=>{ const a=win[f1]||null, b=win[f2]||null;   // vainqueurs KO = projection (jamais "confirmé")
+    teamAt[mn]={a:{t:a,conf:false},b:{t:b,conf:false}}; win[mn]=(a&&b)?(effElo(a)>=effElo(b)?a:b):null; };
+  R16.forEach((p,i)=>adv(89+i,p[0],p[1])); QF.forEach((p,i)=>adv(97+i,p[0],p[1]));
+  SF.forEach((p,i)=>adv(101+i,p[0],p[1])); adv(103,101,102);
+  const cell=c=>`<div class="tm ${c.conf?'':'proj'} ${c.third?'third':''}">${c.t||'—'}</div>`;
+  const card=mn=>{ const d=teamAt[mn]; return `<div class="brk-m"><div class="mn">M${mn}</div>${cell(d.a)}${cell(d.b)}</div>`; };
+  const col=(title,ns)=>`<div class="brk-col"><div class="rnd">${title}</div>${ns.map(card).join('')}</div>`;
+  const champ=win[103];
+  return '<div class="brkleg">Projection live d’après les classements actuels — vainqueurs KO = favori Elo. <b>Gras</b> = qualifié confirmé (poule finie), <i>italique</i> = provisoire.'+
+    (champ?` · Champion projeté : <b class="champ">${champ}</b>`:'')+'</div>'+
+    '<div class="brk">'+col('32es',R16.flat())+col('8es',R16.map((_,i)=>89+i))+
+    col('Quarts',QF.map((_,i)=>97+i))+col('Demies',SF.map((_,i)=>101+i))+col('Finale',[103])+'</div>';
 }
 function renderKO(){
   const tabs=[['groups','Classements'],['bracket','Tableau final']];
   $('koTabs').innerHTML=tabs.map(([k,l])=>`<button class="gchip ${k===koTab?'on':''}" data-k="${k}">${l}</button>`).join('');
   $('koTabs').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{koTab=b.dataset.k;renderKO();});
   const nDone=Object.keys(GROUPS).filter(g=>groupStandings(g).complete).length;
-  $('koCtx').textContent=nDone+'/12 groupes terminés'+(nDone<12?' · le tableau final se complète à mesure que les poules s’achèvent':'');
+  $('koCtx').textContent=nDone+'/12 poules terminées · le tableau final se met à jour en continu (projection)';
   $('koView').innerHTML = koTab==='groups'?renderGroupStandings():renderBracket();
 }
 function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
