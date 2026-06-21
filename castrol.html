@@ -576,6 +576,7 @@ function koWinner(home,away,r){   // résultat 90 min, sinon avantage Elo (prolo
 const TS_MATCH=[74,77,79,80,81,82,85,87];
 const TS_ELIG=['ABCDF','CDFGH','CEFHI','EHIJK','BEFIJ','AEHIJ','EFGIJ','DEIJL'];
 const TS_SETS=TS_ELIG.map(e=>new Set(e.split('')));
+let THIRDS_TABLE=null; // table officielle FIFA des 495 combinaisons (thirds.json) ; null => repli sur assignThirds (Kuhn)
 const R32=[
   {n:73,a:['p',2,'A'],b:['p',2,'B']}, {n:74,a:['p',1,'E'],b:['t',0]},
   {n:75,a:['p',1,'F'],b:['p',2,'C']}, {n:76,a:['p',1,'C'],b:['p',2,'F']},
@@ -589,7 +590,7 @@ const R32=[
 const R16=[[74,77],[73,75],[76,78],[79,80],[83,84],[81,82],[86,88],[85,87]]; // ->89..96
 const QF=[[89,90],[93,94],[91,92],[95,96]]; // ->97..100
 const SF=[[97,98],[99,100]];                // ->101,102
-function assignThirds(groups){   // couplage de Kuhn : 8 groupes (meilleurs 3es) -> 8 créneaux
+function assignThirds(groups){   // REPLI (si thirds.json absent) : couplage de Kuhn 8 groupes -> 8 créneaux (affectation valide)
   const assign=new Array(8).fill(null), gpos=new Array(8).fill(-1);
   function tryA(slot,seen){ for(let k=0;k<8;k++){ const g=groups[k];
     if(TS_SETS[slot].has(g)&&!seen[k]){ seen[k]=true;
@@ -644,7 +645,8 @@ function winSim(selMatch, candidates, nSims, meStrat){
     // 3) 8 meilleurs 3es -> créneaux
     // meilleurs 3es : pas de confrontation directe (groupes différents) -> diff générale -> buts -> classement FIFA (Elo)
     const best8=GL.map(g=>({g,s:SB[g][2]})).sort((x,y)=>y.s.pts-x.s.pts||(y.s.gf-y.s.ga)-(x.s.gf-x.s.ga)||y.s.gf-x.s.gf||fairScore(y.s.team)-fairScore(x.s.team)||fifaScore(y.s.team)-fifaScore(x.s.team)||((ELO[y.s.team]||1700)-(ELO[x.s.team]||1700))).slice(0,8).map(x=>x.g);
-    const tA=assignThirds(best8);
+    const combo=best8.slice().sort().join('');                       // combinaison des 8 groupes qualifiés
+    const tA=(THIRDS_TABLE&&THIRDS_TABLE[combo]) ? THIRDS_TABLE[combo].split('') : assignThirds(best8); // table officielle FIFA, repli Kuhn
     const thirdTeam={}; TS_MATCH.forEach((mn,si)=>{ const g=tA[si]||best8[si]; thirdTeam[mn]=SB[g][2].team; });
     // 4) phase finale
     const W={};
@@ -1103,6 +1105,8 @@ fetch('elo.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
 // Classement FIFA officiel (départage ultime) + fair-play (cartons) — alimentés par les crons GitHub Actions.
 fetch('fifa.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.fifa){ const m={}; for(const k in d.fifa) m[k]=d.fifa[k].points; FIFA_PTS=m; renderAll(); } }).catch(()=>{});
 fetch('fairplay.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.points){ const m={}; for(const en in d.points) m[EN2FR[en]||en]=d.points[en]; FAIRPLAY=m; renderAll(); } }).catch(()=>{});
+// Table officielle FIFA d'affectation des 8 meilleurs 3es (495 combinaisons, statique) — sinon repli Kuhn.
+fetch('thirds.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{ if(d&&typeof d==='object'&&Object.keys(d).length>400){ THIRDS_TABLE=d; renderAll(); } }).catch(()=>{});
 const savedCode=localStorage.getItem(CODE_KEY);
 if(savedCode) connect(savedCode); else setSync('Sync désactivée — clique sur ☁️');
 </script>
