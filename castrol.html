@@ -114,6 +114,7 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
   <h2>Bonus <small>4 pts / bonne réponse · vainqueurs de groupe auto, le reste se saisit au fil du tournoi</small></h2>
   <div id="bonusActualBox"></div>
   <div class="tbl-scroll"><table id="bonusTbl"></table></div>
+  <div id="bonusEditBox"></div>
 </div>
 
 <div class="card">
@@ -854,8 +855,8 @@ function detailBusy(){
 }
 let lastBonusInput=0;
 function bonusBusy(){   // ne pas reconstruire le bloc Bonus pendant qu'un menu déroulant est ouvert (sinon il se referme)
-  const ae=document.activeElement, b=document.getElementById('bonusActualBox');
-  return (ae && b && b.contains(ae)) || (Date.now()-lastBonusInput < 4000);
+  const ae=document.activeElement, a=document.getElementById('bonusActualBox'), e=document.getElementById('bonusEditBox');
+  return (ae && ((a&&a.contains(ae))||(e&&e.contains(ae)))) || (Date.now()-lastBonusInput < 4000);
 }
 function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
   if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
@@ -894,15 +895,53 @@ function renderBonus(){
   $('bonusActualBox').querySelectorAll('.bsel,.gwsel').forEach(sel=>{
     ['focus','mousedown','touchstart'].forEach(ev=>sel.addEventListener(ev, ()=>{ lastBonusInput=Date.now(); }, {passive:true}));
   });
-  // table des pronos bonus de chaque joueur + B
+  renderBonusTable();
+  renderBonusEditor();
+}
+function renderBonusTable(){
   let h='<thead><tr><th class="l">Joueur</th><th>Buteur</th><th>Demi-finalistes</th><th>Champion</th><th>Bonus (B)</th></tr></thead><tbody>';
   PLAYERS.forEach(pl=>{ const bp=BONUS_PICKS[pl]; const br=bonusBreakdown(pl);
     if(!bp || !bp.tor){ h+=`<tr><td class="l">${pl}</td><td colspan="4" style="color:var(--faint)">aucun bonus joué</td></tr>`; return; }
     h+=`<tr class="${pl===ME?'you':''}"><td class="l">${pl}${pl===ME?' ⭐':''}</td>`+
-       `<td>${bp.tor||'—'}</td><td style="font-size:12px">${(bp.df||[]).join(', ')}</td>`+
+       `<td>${bp.tor||'—'}</td><td style="font-size:12px">${(bp.df||[]).filter(Boolean).join(', ')}</td>`+
        `<td>${bp.champ||'—'}</td><td class="pts" style="color:var(--gold)">${br.total}</td></tr>`;
   });
   h+='</tbody>'; $('bonusTbl').innerHTML=h;
+}
+/* ----- Éditeur des pronos bonus d'un joueur (corriger une coquille, compléter) ----- */
+let editPlayer = ME; let editorOpen=false;
+function teamSelectE(k, val){
+  return `<select class="ebsel" data-k="${k}"><option value="">—</option>`+
+    ALL_TEAMS.map(t=>`<option value="${t}" ${t===val?'selected':''}>${t}</option>`).join('')+`</select>`;
+}
+function renderBonusEditor(){
+  const box=$('bonusEditBox'); if(!box) return;
+  if(!BONUS_PICKS[editPlayer]) BONUS_PICKS[editPlayer]={tor:null,df:[null,null,null,null],gw:{},champ:null};
+  const bp=BONUS_PICKS[editPlayer];
+  let h=`<details ${editorOpen?'open':''} style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;font-weight:700">✏️ Modifier les pronos bonus d'un joueur</summary><div style="margin-top:8px">`;
+  h+=`<div class="note">Joueur : <select id="editPlayerSel" class="ebsel" style="font-weight:700">`+PLAYERS.map(p=>`<option value="${p}" ${p===editPlayer?'selected':''}>${p}</option>`).join('')+`</select></div>`;
+  h+=`<div class="note" style="margin-top:6px;color:var(--chalk)"><b>Équipe du buteur</b> : ${teamSelectE('tor', bp.tor||'')} &nbsp; <b>Champion</b> : ${teamSelectE('champ', bp.champ||'')}</div>`;
+  h+=`<div class="note" style="margin-top:6px;color:var(--chalk)"><b>4 demi-finalistes</b> : `+[0,1,2,3].map(i=>teamSelectE('df'+i, (bp.df&&bp.df[i])||'')).join(' ')+`</div>`;
+  h+=`<div class="note" style="margin-top:6px;color:var(--chalk)"><b>Vainqueurs de groupe (12)</b><div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:5px">`+
+    Object.keys(GROUPS).sort().map(g=>`<span style="font-family:var(--mono);font-size:12px;white-space:nowrap"><b>${g}</b> <select class="ebsel" data-k="gw_${g}"><option value="">—</option>`+(GROUPS[g]||[]).map(t=>`<option value="${t}" ${(bp.gw&&bp.gw[g])===t?'selected':''}>${t}</option>`).join('')+`</select></span>`).join('')+`</div></div>`;
+  h+=`</div></details>`;
+  box.innerHTML=h;
+  const det=box.querySelector('details'); if(det) det.addEventListener('toggle',()=>{ editorOpen=det.open; });
+  $('editPlayerSel').onchange=()=>{ lastBonusInput=Date.now(); editorOpen=true; editPlayer=$('editPlayerSel').value; renderBonusEditor(); };
+  box.querySelectorAll('.ebsel').forEach(sel=>{
+    ['focus','mousedown','touchstart'].forEach(ev=>sel.addEventListener(ev,()=>{ lastBonusInput=Date.now(); },{passive:true}));
+    if(sel.id==='editPlayerSel') return;
+    sel.onchange=()=>{ lastBonusInput=Date.now(); applyBonusEdit(sel); };
+  });
+}
+function applyBonusEdit(sel){
+  const bp=BONUS_PICKS[editPlayer]; if(!bp) return;
+  const k=sel.dataset.k, v=sel.value||null;
+  if(k==='tor') bp.tor=v;
+  else if(k==='champ') bp.champ=v;
+  else if(k.indexOf('df')===0){ if(!Array.isArray(bp.df)) bp.df=[null,null,null,null]; bp.df[+k.slice(2)]=v; }
+  else if(k.indexOf('gw_')===0){ if(!bp.gw) bp.gw={}; const g=k.slice(3); if(v) bp.gw[g]=v; else delete bp.gw[g]; }
+  saveLocal(); cloudMaybePush(); renderStandings(); renderBonusTable();
 }
 
 function renderStyle(){
@@ -953,7 +992,7 @@ function renderCalib(){
 const LS='castrol_legends_state_v2';   // clé versionnée : ignore les sauvegardes de l'ancien schéma
 const SCHEMA=2;
 // NB : on NE persiste PAS les paramètres du modèle ici (source unique = simulateur principal)
-function serialize(){ return { v:SCHEMA, matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL }; }
+function serialize(){ return { v:SCHEMA, matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL, picks: BONUS_PICKS }; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
 // renvoie true si appliqué, false si schéma incompatible (ancienne version) -> évite la corruption
 function applyState(s){
@@ -965,6 +1004,8 @@ function applyState(s){
     champ: s.bonus.champ||null, tor: s.bonus.tor||null,
     gw: (s.bonus.gw && typeof s.bonus.gw==='object') ? s.bonus.gw : {} };
     while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
+  // pronos bonus des joueurs édités (override des valeurs câblées) — additif, rétro-compatible
+  if(s.picks && typeof s.picks==='object'){ Object.keys(s.picks).forEach(pl=>{ if(s.picks[pl]) BONUS_PICKS[pl]=s.picks[pl]; }); }
   return true;
 }
 function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
