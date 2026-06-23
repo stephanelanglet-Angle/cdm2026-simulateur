@@ -1,6 +1,10 @@
 {
   "_source": "eloratings.net",
+<<<<<<< Updated upstream
   "_updated": "2026-06-22",
+=======
+  "_updated": "2026-06-23",
+>>>>>>> Stashed changes
   "elo": {
     "Mexique": 1896,
     "Corée du Sud": 1771,
@@ -34,6 +38,7 @@
     "Uruguay": 1851,
     "Arabie saoudite": 1593,
     "Cap-Vert": 1625,
+<<<<<<< Updated upstream
     "France": 2084,
     "Sénégal": 1839,
     "Norvège": 1929,
@@ -42,6 +47,16 @@
     "Autriche": 1841,
     "Algérie": 1759,
     "Jordanie": 1653,
+=======
+    "France": 2090,
+    "Sénégal": 1817,
+    "Norvège": 1951,
+    "Irak": 1586,
+    "Argentine": 2144,
+    "Autriche": 1841,
+    "Algérie": 1780,
+    "Jordanie": 1632,
+>>>>>>> Stashed changes
     "Portugal": 1967,
     "Colombie": 1998,
     "Ouzbékistan": 1698,
