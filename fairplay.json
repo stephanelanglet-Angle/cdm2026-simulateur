@@ -1,6 +1,6 @@
 {
   "_source": "en.wikipedia.org (Discipline)",
-  "_updated": "2026-06-23",
+  "_updated": "2026-06-24",
   "points": {
     "Czech Republic": -1,
     "South Korea": -3,
@@ -46,9 +46,9 @@
     "DR Congo": -1,
     "Uzbekistan": -2,
     "Portugal": -4,
-    "Croatia": 0,
     "England": -1,
+    "Croatia": -1,
     "Ghana": -2,
-    "Panama": -2
+    "Panama": -3
   }
 }
