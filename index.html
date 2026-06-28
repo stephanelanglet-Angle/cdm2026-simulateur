@@ -1123,7 +1123,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
         setStatus('☁️ ' + code + ' · prêt (en attente d\'un autre appareil)');
         return;
       }
-      const shared = { params: val.params || {}, nSims: val.nSims || null, constraints: val.constraints || {} };
+      const shared = { params: val.params || {}, nSims: val.nSims || null, constraints: val.constraints || {}, ko: val.ko || {} };
       const sig = stableSig(shared);
       gotInitial = true;
       if (sig === lastCloudSig){ setStatus('☁️ ' + code + ' · à jour'); return; }  // notre propre écho
