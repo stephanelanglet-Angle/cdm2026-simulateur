@@ -155,6 +155,21 @@ footer{margin-top:26px;color:var(--faint);font-size:11.5px;line-height:1.6;borde
   .ioBar{flex-direction:column}
   .ioBtn{width:100%}
 }
+/* Tableau final (KO) */
+#koCard .koChamp{font-size:14px;margin-bottom:12px;color:var(--chalk)} #koCard .koChamp b{color:var(--gold)} #koCard .koChamp small{color:var(--faint)}
+.koWrap{overflow-x:auto}
+.kobr{display:flex;gap:14px;padding-bottom:8px;min-width:max-content}
+.kocol{flex:0 0 170px;display:flex;flex-direction:column;gap:8px}
+.kocol .korn{font-size:10.5px;color:var(--faint);font-family:ui-monospace,monospace;text-transform:uppercase;letter-spacing:.05em}
+.komatch{border:1px solid var(--line2);border-radius:8px;background:var(--panel2);overflow:hidden}
+.komatch.koclick .kotm[data-pick]{cursor:pointer}
+.komatch.koclick .kotm[data-pick]:hover{background:var(--line)}
+.kotm{display:flex;align-items:center;gap:6px;padding:5px 8px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.kotm:last-child{border-bottom:none}
+.kotm .koname{flex:1;font-weight:600}
+.kotm.koproj .koname{color:var(--faint);font-style:italic;font-weight:400}
+.kotm.kowin{background:rgba(88,194,129,.14)} .kotm.kowin .koname{color:var(--grass);font-weight:700}
+.kotm .kofl{font-size:13px} .kotm .kop{font-family:ui-monospace,monospace;font-size:11px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -234,6 +249,13 @@ footer{margin-top:26px;color:var(--faint);font-size:11.5px;line-height:1.6;borde
   </div>
   <button id="moreBtn">Afficher les 48 équipes</button>
   <div class="tnote" id="tnote"></div>
+</section>
+
+<section class="card" id="koCard" aria-label="Tableau final">
+  <h2>Tableau final <small>clique l'équipe qui se qualifie — la simulation se recalcule sur les tours restants</small></h2>
+  <div id="koChampLine" class="koChamp"></div>
+  <div class="koWrap"><div id="koBracket" class="kobr"></div></div>
+  <div class="tnote">Le bracket part des vrais qualifiés (phase de groupes terminée). <b>Gras + %</b> = équipe réelle et sa probabilité de titre (sim) ; <i>—</i> = à déterminer. Un clic verrouille le vainqueur d'un match ; reclic pour libérer.</div>
 </section>
 
 <footer id="foot"></footer>
@@ -488,6 +510,7 @@ const state = {
   params: { hostBonus:60, divGoals:280, muTotal:3.15 },   // défauts recalés sur les 12 premiers matchs (14/06) ; μ = observé brut (3,17)
   nSims: 10000,
   constraints: new Map(),
+  ko: {},                 // tableau final : { 'r32-0':teamIdx, 'r16-0':…, … } = vainqueur verrouillé par match KO
   baseline: null,
   current: null,
   selGroup: 'A',
@@ -579,6 +602,7 @@ function importState(data) {
     }
   }
   state.constraints = new Map(s.constraints ? Object.entries(s.constraints) : []);
+  if (s.ko && typeof s.ko === 'object') state.ko = s.ko;
   if (s.selGroup) state.selGroup = s.selGroup;
   if (s.selPair !== undefined) state.selPair = s.selPair;
   if (s.showAll !== undefined) state.showAll = s.showAll;
@@ -589,6 +613,7 @@ function importState(data) {
   renderDetail();
   renderTable();
   renderStatus();
+  if (typeof renderKObracket === 'function') renderKObracket();
   scheduleRun(500);
 }
 
@@ -601,6 +626,7 @@ function saveToLocalStorage() {
         params: {...state.params},
         nSims: state.nSims,
         constraints: Object.fromEntries(state.constraints),
+        ko: state.ko,
         selGroup: state.selGroup,
         selPair: state.selPair,
         showAll: state.showAll
@@ -856,6 +882,75 @@ $('moreBtn').onclick = () => {
 
 $('exportBtn').onclick = exportState;
 $('importBtn').onclick = () => $('importFile').click();
+/* ======================= TABLEAU FINAL (KO) SAISISSABLE ======================= */
+// Vrai bracket R32 (matchs 73-88, ordre régie) — calculé depuis les vrais résultats de groupe (Art.13), vérifié.
+const KO_R32_NAMES = [
+  ['Afrique du Sud','Canada'],['Allemagne','Paraguay'],['Pays-Bas','Maroc'],['Brésil','Japon'],
+  ['France','Suède'],["Côte d'Ivoire",'Norvège'],['Mexique','Équateur'],['Angleterre','RD Congo'],
+  ['États-Unis','Bosnie'],['Belgique','Sénégal'],['Portugal','Croatie'],['Espagne','Autriche'],
+  ['Suisse','Algérie'],['Argentine','Cap-Vert'],['Colombie','Ghana'],['Australie','Égypte']
+];
+const KO_R16P=[[1,4],[0,2],[3,5],[6,7],[10,11],[8,9],[13,15],[12,14]], KO_QFP=[[0,1],[4,5],[2,3],[6,7]];
+const _koNorm=s=>s.normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[’']/g,"'").toLowerCase().trim();
+const _koByNorm={}; TEAMS.forEach(t=>_koByNorm[_koNorm(t.name)]=t.id);
+const KO_R32=KO_R32_NAMES.map(p=>[_koByNorm[_koNorm(p[0])], _koByNorm[_koNorm(p[1])]]);
+// bracket déterministe d'après les vainqueurs verrouillés (state.ko) ; un match n'est résolu que si ses 2 équipes le sont
+function koReal(){
+  const ko=state.ko||{}, teams={}, win={};
+  const valid=(slot,a,b)=> (a!=null&&b!=null&&(ko[slot]===a||ko[slot]===b))?ko[slot]:null;
+  for(let m=0;m<16;m++){ const a=KO_R32[m][0],b=KO_R32[m][1]; teams['r32-'+m]=[a,b]; win['r32-'+m]=valid('r32-'+m,a,b); }
+  const adv=(slot,fr,fd)=>{ const a=win[fr+'-'+fd[0]], b=win[fr+'-'+fd[1]]; teams[slot]=[a,b]; win[slot]=valid(slot,a,b); };
+  KO_R16P.forEach((p,m)=>adv('r16-'+m,'r32',p));
+  KO_QFP.forEach((p,m)=>adv('qf-'+m,'r16',p));
+  adv('sf-0','qf',[0,1]); adv('sf-1','qf',[2,3]); adv('final-0','sf',[0,1]);
+  return {teams,win};
+}
+// Monte-Carlo KO conditionné par les résultats saisis -> probas par équipe
+function koSimulate(nSims, real){
+  const elo=TEAMS.map(t=>effElo(t,state.params.hostBonus)), rnd=mulberry32(0x9E3779B1), W=real.win;
+  const cChamp=new Float64Array(NT),cFinal=new Float64Array(NT),cSF=new Float64Array(NT),cQF=new Float64Array(NT),cR16=new Float64Array(NT);
+  for(let s=0;s<nSims;s++){
+    const w32=new Int16Array(16);
+    for(let m=0;m<16;m++){ const lk=W['r32-'+m]; w32[m]= lk!=null?lk:simKO(KO_R32[m][0],KO_R32[m][1],elo,state.params,rnd); }
+    const w16=new Int16Array(8);
+    for(let m=0;m<8;m++){ const lk=W['r16-'+m]; w16[m]= lk!=null?lk:simKO(w32[KO_R16P[m][0]],w32[KO_R16P[m][1]],elo,state.params,rnd); }
+    const wqf=new Int16Array(4);
+    for(let m=0;m<4;m++){ const lk=W['qf-'+m]; wqf[m]= lk!=null?lk:simKO(w16[KO_QFP[m][0]],w16[KO_QFP[m][1]],elo,state.params,rnd); }
+    const sf0= W['sf-0']!=null?W['sf-0']:simKO(wqf[0],wqf[1],elo,state.params,rnd);
+    const sf1= W['sf-1']!=null?W['sf-1']:simKO(wqf[2],wqf[3],elo,state.params,rnd);
+    const ch= W['final-0']!=null?W['final-0']:simKO(sf0,sf1,elo,state.params,rnd);
+    for(let m=0;m<16;m++) cR16[w32[m]]++;
+    for(let m=0;m<8;m++) cQF[w16[m]]++;
+    for(let m=0;m<4;m++) cSF[wqf[m]]++;
+    cFinal[sf0]++;cFinal[sf1]++;cChamp[ch]++;
+  }
+  return {cChamp,cFinal,cSF,cQF,cR16,n:nSims};
+}
+function renderKObracket(){
+  const host=$('koBracket'); if(!host) return;
+  const real=koReal(), sim=koSimulate(5000, real), n=sim.n;
+  const pct=i=> i==null?0:100*sim.cChamp[i]/n, nm=i=> i==null?'—':TEAMS[i].name, fl=i=> i==null?'':TEAMS[i].flag;
+  const rounds=[['32es',16,'r32'],['8es',8,'r16'],['Quarts',4,'qf'],['Demies',2,'sf'],['Finale',1,'final']];
+  host.innerHTML=rounds.map(([title,cnt,pre])=>{
+    let cells='';
+    for(let m=0;m<cnt;m++){ const slot=pre+'-'+m, pair=real.teams[slot]||[null,null], w=real.win[slot], clickable=pair[0]!=null&&pair[1]!=null;
+      const tcell=idx=>{ const t=pair[idx], realT=t!=null, isW=w!=null&&w===t;
+        return `<div class="kotm ${realT?'':'koproj'} ${isW?'kowin':''}" ${clickable?`data-pick="${slot}|${t}"`:''}>`+
+          `${realT?`<span class="kofl">${fl(t)}</span>`:''}<span class="koname">${nm(t)}</span>${realT?`<span class="kop">${pct(t).toFixed(0)}%</span>`:''}</div>`; };
+      cells+=`<div class="komatch ${clickable?'koclick':''}">${tcell(0)}${tcell(1)}</div>`; }
+    return `<div class="kocol"><div class="korn">${title}</div>${cells}</div>`;
+  }).join('');
+  const champ=real.win['final-0']; let bi=0,bv=-1; for(let i=0;i<NT;i++) if(sim.cChamp[i]>bv){bv=sim.cChamp[i];bi=i;}
+  $('koChampLine').innerHTML= champ!=null? `🏆 Champion : <b>${TEAMS[champ].name}</b>`
+    : `Favori au titre <small>(sim conditionnée par tes résultats saisis)</small> → <b>${TEAMS[bi].name} ${(100*bv/n).toFixed(1)} %</b>`;
+  host.querySelectorAll('[data-pick]').forEach(el=>el.onclick=()=>{
+    const parts=el.dataset.pick.split('|'), slot=parts[0], ti=+parts[1];
+    if(!state.ko) state.ko={};
+    if(state.ko[slot]===ti) delete state.ko[slot]; else state.ko[slot]=ti;   // clic sur l'équipe qui passe ; reclic = libère
+    saveToLocalStorage(); if(typeof koSyncPush==='function') koSyncPush();
+    renderKObracket();
+  });
+}
 $('importFile').addEventListener('change', importStateFromFile);
 
 const loadedFromStorage = loadFromLocalStorage();
@@ -866,6 +961,7 @@ if (!loadedFromStorage) {
   renderStatus();
   run();
 }
+renderKObracket();
 
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
   document.addEventListener('touchmove', function(event) {
@@ -980,7 +1076,8 @@ window.addEventListener('beforeunload', saveToLocalStorage);
       return {
         params: { hostBonus: state.params.hostBonus, divGoals: state.params.divGoals, muTotal: state.params.muTotal },
         nSims: state.nSims || null,
-        constraints: Object.fromEntries(state.constraints)
+        constraints: Object.fromEntries(state.constraints),
+        ko: state.ko || {}
       };
     } catch(e){ return null; }
   }
@@ -990,7 +1087,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
     try {
       // importState ne modifie pas la sélection locale (selGroup/selPair/showAll absents)
       importState({ version: 1, state: {
-        params: shared.params, nSims: shared.nSims, constraints: shared.constraints || {}
+        params: shared.params, nSims: shared.nSims, constraints: shared.constraints || {}, ko: shared.ko || {}
       }});
     } catch(e){ console.warn('Sync applyRemote:', e); }
     applyingRemote = false;
@@ -1002,6 +1099,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
       params: shared.params || {},
       nSims: shared.nSims || null,
       constraints: shared.constraints || {},
+      ko: shared.ko || {},
       savedAt: nowT(), savedAtISO: (function(){ try { return new Date().toISOString(); } catch(e){ return ''; } })()
     }).catch(e => { console.warn('Sync push:', e); setStatus('☁️ ' + syncCode + ' · erreur envoi'); });
   }
