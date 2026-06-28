@@ -613,7 +613,6 @@ function importState(data) {
   renderDetail();
   renderTable();
   renderStatus();
-  if (typeof renderKObracket === 'function') renderKObracket();
   scheduleRun(500);
 }
 
@@ -1076,8 +1075,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
       return {
         params: { hostBonus: state.params.hostBonus, divGoals: state.params.divGoals, muTotal: state.params.muTotal },
         nSims: state.nSims || null,
-        constraints: Object.fromEntries(state.constraints),
-        ko: state.ko || {}
+        constraints: Object.fromEntries(state.constraints)
       };
     } catch(e){ return null; }
   }
@@ -1087,7 +1085,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
     try {
       // importState ne modifie pas la sélection locale (selGroup/selPair/showAll absents)
       importState({ version: 1, state: {
-        params: shared.params, nSims: shared.nSims, constraints: shared.constraints || {}, ko: shared.ko || {}
+        params: shared.params, nSims: shared.nSims, constraints: shared.constraints || {}
       }});
     } catch(e){ console.warn('Sync applyRemote:', e); }
     applyingRemote = false;
@@ -1099,7 +1097,6 @@ window.addEventListener('beforeunload', saveToLocalStorage);
       params: shared.params || {},
       nSims: shared.nSims || null,
       constraints: shared.constraints || {},
-      ko: shared.ko || {},
       savedAt: nowT(), savedAtISO: (function(){ try { return new Date().toISOString(); } catch(e){ return ''; } })()
     }).catch(e => { console.warn('Sync push:', e); setStatus('☁️ ' + syncCode + ' · erreur envoi'); });
   }
@@ -1123,7 +1120,7 @@ window.addEventListener('beforeunload', saveToLocalStorage);
         setStatus('☁️ ' + code + ' · prêt (en attente d\'un autre appareil)');
         return;
       }
-      const shared = { params: val.params || {}, nSims: val.nSims || null, constraints: val.constraints || {}, ko: val.ko || {} };
+      const shared = { params: val.params || {}, nSims: val.nSims || null, constraints: val.constraints || {} };
       const sig = stableSig(shared);
       gotInitial = true;
       if (sig === lastCloudSig){ setStatus('☁️ ' + code + ' · à jour'); return; }  // notre propre écho
