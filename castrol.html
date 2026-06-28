@@ -100,6 +100,10 @@ input.sc{width:46px;background:var(--panel2);border:1px solid var(--line2);borde
 .brk-m .tm.third{color:var(--gold)}
 .brk-m .tm .pc{flex:none;color:var(--faint);font-weight:400;font-style:normal;font-family:var(--mono);font-size:10.5px}
 .brk-m .tm .pc.fav{color:var(--grass)}
+.brk-m.kobtn{display:block;width:100%;text-align:left}
+.brk-m.kobtn:hover{border-color:var(--grass)}
+.brk-m .tm.kowin>span{color:var(--grass);font-weight:700}
+.brk-m .tm .kosc{font-family:var(--mono);font-weight:700;color:var(--chalk);margin-right:2px}
 .brkleg{font-size:11px;color:var(--faint);line-height:1.5;margin-bottom:10px}
 .brkleg b{color:var(--chalk);font-weight:700}
 .brkleg .champ{color:var(--gold)}
@@ -553,6 +557,9 @@ function standings(){
   MATCHES.forEach(m=>{ if(!m.res)return;
     PLAYERS.forEach(pl=>{ const pr=m.preds[pl]; if(pr) mp[pl]+=pts(pr[0],pr[1],m.res[0],m.res[1]); });
   });
+  Object.keys(KO.res).forEach(n=>{ const r=KO.res[n], pd=KO.preds[n]||{};
+    PLAYERS.forEach(pl=>{ const pr=pd[pl]; if(pr) mp[pl]+=pts(pr[0],pr[1],r[0],r[1]); });
+  });
   const rows=PLAYERS.map(p=>{ const b=bonusPoints(p); return {p, mpts:mp[p], bpts:b, pts:mp[p]+b}; }).sort((x,y)=>y.pts-x.pts);
   let pos=0,last=null,seen=0;
   rows.forEach(r=>{ seen++; if(r.pts!==last){pos=seen;last=r.pts;} r.pos=pos; });
@@ -634,6 +641,32 @@ function assignThirds(groups){   // REPLI (si thirds.json absent) : couplage de 
     for(const g of groups){ if(!used.has(g)&&TS_SETS[s].has(g)){ assign[s]=g; break; } } } }
   return assign;
 }
+
+// ===== Phase finale saisissable (32es -> finale) =====
+let KO = { res:{}, win:{}, preds:{} };   // res[n]=[a,b] résultat réel ; win[n]='h'|'a' (vainqueur t.a.b. si nul) ; preds[n]={joueur:[a,b]}
+const KO_RNAME={}; R16.flat().forEach(n=>KO_RNAME[n]='32e'); R16.forEach((_,i)=>KO_RNAME[89+i]='8e'); QF.forEach((_,i)=>KO_RNAME[97+i]='Quart'); SF.forEach((_,i)=>KO_RNAME[101+i]='Demie'); KO_RNAME[103]='Finale';
+const KO_ALL=[...R16.flat(),...R16.map((_,i)=>89+i),...QF.map((_,i)=>97+i),...SF.map((_,i)=>101+i),103];
+// résout équipes + vainqueur de chaque match KO : résultat réel (KO.res) si saisi, sinon projeté (favori du modèle)
+function koState(){
+  const {SB,thirdTeam,complete,allComplete}=bracketData();
+  const tA={},tB={},win={},real={},cA={},cB={},cW={};  // c* = équipe/vainqueur RÉEL (vs projeté)
+  function decide(n,a,b,ca,cb){ tA[n]=a; tB[n]=b; cA[n]=ca; cB[n]=cb; const r=KO.res[n];
+    if(r){ real[n]=r; win[n]= r[0]>r[1]?a : r[1]>r[0]?b : (KO.win[n]==='a'?b : KO.win[n]==='h'?a : (a&&b?(effElo(a)>=effElo(b)?a:b):null)); cW[n]= !!(ca&&cb); }
+    else { win[n]= (a&&b)?(koWin(a,b)>=0.5?a:b):null; cW[n]=false; } }
+  R32.forEach(mt=>{ const a=mt.a[0]==='p'?(SB[mt.a[2]]?SB[mt.a[2]][mt.a[1]-1].team:null):(thirdTeam[mt.n]||null);
+    const b=mt.b[0]==='p'?(SB[mt.b[2]]?SB[mt.b[2]][mt.b[1]-1].team:null):(thirdTeam[mt.n]||null);
+    const ca=mt.a[0]==='p'?!!complete[mt.a[2]]:allComplete, cb=mt.b[0]==='p'?!!complete[mt.b[2]]:allComplete;
+    decide(mt.n,a,b,ca,cb); });
+  R16.forEach((p,i)=>decide(89+i,win[p[0]],win[p[1]],cW[p[0]],cW[p[1]]));
+  QF.forEach((p,i)=>decide(97+i,win[p[0]],win[p[1]],cW[p[0]],cW[p[1]]));
+  SF.forEach((p,i)=>decide(101+i,win[p[0]],win[p[1]],cW[p[0]],cW[p[1]]));
+  decide(103,win[101],win[102],cW[101],cW[102]);
+  return {tA,tB,win,real,cA,cB,cW};
+}
+function koMatchObj(n){ const ks=koState(); if(!KO.preds[n])KO.preds[n]={};
+  return {n,id:n,home:ks.tA[n],away:ks.tB[n],g:KO_RNAME[n],ko:true,date:'',
+    get res(){return KO.res[n]||null;}, set res(v){KO.res[n]=v;}, preds:KO.preds[n], ks}; }
+function findMatch(id){ return MATCHES.find(x=>x.id===id) || (id>=73?koMatchObj(id):null); }
 
 function winSim(selMatch, candidates, nSims, meStrat){
   // "futur moi" : meStrat 'ev' (défaut) = jeu EV réaliste ; 'var' = variance max vs le leader sur TOUS
@@ -738,12 +771,26 @@ function renderStandings(){
 const MONTHS=['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 function frDate(iso){ if(!iso) return ''; const p=iso.split('-'); return (+p[2])+' '+(MONTHS[+p[1]-1]||''); }
 function renderGroups(){
-  const chips=[{g:'ALL',label:'📅 Calendrier'}].concat(Object.keys(GROUPS).map(g=>({g,label:'Gr '+g})));
+  const chips=[{g:'ALL',label:'📅 Calendrier'}].concat(Object.keys(GROUPS).map(g=>({g,label:'Gr '+g}))).concat([{g:'KO',label:'🏆 Phase finale'}]);
   $('groupSel').innerHTML = chips.map(c=>`<button class="gchip ${c.g===selGroup?'on':''}" data-g="${c.g}">${c.label}</button>`).join('');
   $('groupSel').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{selGroup=b.dataset.g;renderMatchList();});
 }
+function renderKOList(){
+  const ks=koState(); let html='', lastR=null;
+  KO_ALL.forEach(n=>{ const rn=KO_RNAME[n];
+    if(rn!==lastR){ html+=`<div class="dayLbl" style="color:var(--faint);font-family:var(--mono);font-size:11.5px;margin:10px 2px 4px">${rn==='Finale'?'Finale':rn+' de finale'}</div>`; lastR=rn; }
+    const a=ks.tA[n], b=ks.tB[n], res=KO.res[n], known=!!(ks.cA[n]&&ks.cB[n]);
+    const tag=res?`<span class="scoreTag res">${res[0]}-${res[1]}</span>`:`<span class="scoreTag up">${known?'à saisir':'—'}</span>`;
+    const teams=known?`${a} <span style="color:var(--faint)">vs</span> ${b}`:`<span style="color:var(--faint)">à déterminer</span>`;
+    const meta=known?`Match n°${n} · Elo ${Math.round(effElo(a))} – ${Math.round(effElo(b))}`:`Match n°${n}`;
+    html+=`<button class="mrow ${n===selId?'sel':''} ${res?'done':''}" data-id="${n}" ${known?'':'style="opacity:.5"'}>${tag}<div class="t">${teams}</div><div class="meta">${meta}</div></button>`;
+  });
+  $('matchList').innerHTML=html;
+  $('matchList').querySelectorAll('.mrow').forEach(b=>b.onclick=()=>{selId=+b.dataset.id;renderMatchList();renderDetail();});
+}
 function renderMatchList(){
   renderGroups();
+  if(selGroup==='KO'){ renderKOList(); return; }
   // toujours triés par n° de match = ordre calendaire
   const ms=(selGroup==='ALL'?MATCHES:MATCHES.filter(m=>m.g===selGroup)).slice().sort((x,y)=>x.n-y.n);
   let html='', lastDate=null;
@@ -767,11 +814,13 @@ function distRow(G){
 }
 
 function renderDetail(){
-  const m=MATCHES.find(x=>x.id===selId);
+  const m=findMatch(selId);
   if(!m){ $('detail').innerHTML='<div class="note">—</div>'; return; }
+  if(m.ko && !(m.ks.cA[m.n]&&m.ks.cB[m.n])){ $('detail').innerHTML=`<h2>${m.g==='Finale'?'Finale':m.g+' de finale'} <small>Match n°${m.n}</small></h2><div class="note">En attente des qualifiés — saisis d'abord les résultats du tour précédent pour connaître les deux équipes${m.home&&m.away?` (projection : <b>${m.home}</b> vs <b>${m.away}</b>)`:''}.</div>`; return; }
   const G=grid(m.home,m.away);
   const style=playerStyle();
-  let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>Match n°${m.n} · ${frDate(m.date)} · Gr ${m.g}</small></h2>`;
+  const sub = m.ko ? (m.g==='Finale'?'Finale':m.g+' de finale')+` · Match n°${m.n}` : `Match n°${m.n} · ${frDate(m.date)} · Gr ${m.g}`;
+  let h=`<h2>${m.home} <small>vs</small> ${m.away} <small>${sub}</small></h2>`;
   h+=`<div class="kv"><span>Probabilités</span><b>${m.home} ${(100*G.pH).toFixed(1)}% · Nul ${(100*G.pD).toFixed(1)}% · ${m.away} ${(100*G.pA).toFixed(1)}%</b></div>`;
   h+=`<div class="kv"><span>Buts attendus (modèle)</span><b>${G.la.toFixed(2)} – ${G.lb.toFixed(2)}</b></div>`;
   h+=`<div class="note" style="color:var(--faint)">entrées : μ=${P.muTotal.toFixed(2)} · div=${P.divGoals} · hôte=+${P.hostBonus} · Elo eff ${Math.round(effElo(m.home))} / ${Math.round(effElo(m.away))}</div>`;
@@ -786,6 +835,9 @@ function renderDetail(){
     h+=`<div class="editrow" style="margin-top:10px"><span class="nm">Corriger le résultat</span>`+
        `<input class="sc" id="rA" value="${m.res[0]}"><input class="sc" id="rB" value="${m.res[1]}">`+
        `<button class="btn" id="rSave">OK</button></div>`;
+    if(m.ko && m.res[0]===m.res[1]){ const w=KO.win[m.n];
+      h+=`<div class="editrow" style="margin-top:6px"><span class="nm warn">Nul → qualifié (t.a.b.)</span>`+
+         `<button class="gchip ${w==='h'?'on':''}" id="koWh">${m.home}</button> <button class="gchip ${w==='a'?'on':''}" id="koWa">${m.away}</button></div>`; }
   } else {
     const ev=bestEV(G);
     h+=`<div class="kv" style="margin-top:10px"><span>Prono à <b>points espérés</b> max</span><span class="pill ev">${ev.pred[0]}-${ev.pred[1]} · ${ev.ev.toFixed(2)} pts</span></div>`;
@@ -794,8 +846,8 @@ function renderDetail(){
     // projections adversaires (skip inactifs ; menaces en rouge) — rafraîchies en direct à la saisie
     h+=`<div class="note" style="margin-top:8px">Pronos probables des adversaires (projetés selon style <b>+ précision</b>, ⚠️ rouge = menace) :</div>`;
     h+=`<div id="oppProj" style="margin-top:5px">${projTags(G,style)}</div>`;
-    // reco gagnante
-    h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
+    // reco gagnante (poules seulement — la simulation "gagner le concours" est calée sur la phase de groupes)
+    if(!m.ko) h+=`<div class="reco" id="reco"><div class="kv" style="border:none"><span>🏆 Reco pour <b>gagner le concours</b></span>`+
        `<button class="btn primary" id="winBtn">Calculer</button></div>`+
        `<div class="kv" style="border:none;padding-top:2px"><span>Stratégie <small style="color:var(--faint)">variance auto-dosée pour gagner</small></span>`+
        `<select id="braquetSel" class="bsel" style="flex:none;width:auto"><option value="grignoter">🐜 Grignoter (remonter)</option><option value="cible">🎯 Mode Gagner (1ʳᵉ place)</option><option value="0">🛡️ Prudent (EV)</option><option value="0.1">⚖️ Équilibré</option><option value="0.2">🔥 Agressif</option><option value="0.4">🚀 All-in</option></select></div>`+
@@ -824,6 +876,8 @@ function wireDetail(m,G){
   const rSave=$('rSave');
   if(rSave) rSave.onclick=()=>{ const a=parseInt($('rA').value,10), b=parseInt($('rB').value,10);
     if(Number.isFinite(a)&&Number.isFinite(b)){ m.res=[a,b]; afterEdit(); } };
+  const kwh=$('koWh'); if(kwh) kwh.onclick=()=>{ KO.win[m.n]='h'; afterEdit(); };
+  const kwa=$('koWa'); if(kwa) kwa.onclick=()=>{ KO.win[m.n]='a'; afterEdit(); };
   ['rA','rB'].forEach(id=>{ const el=$(id); if(el) el.addEventListener('input', ()=>{ lastDetailInput=Date.now(); }); });
   document.querySelectorAll('.pin').forEach(inp=>{
     const save=()=>{ const pl=inp.dataset.pl;
@@ -977,23 +1031,17 @@ function bracketData(){
 }
 function koWin(h,a){ const G=grid(h,a); return G.pH + G.pD*0.5; } // P(h se qualifie) selon le modèle ; match nul -> tirs au but 50/50
 function renderBracket(){
-  const {SB,complete,allComplete,thirdTeam}=bracketData();
-  const teamAt={}, win={};
-  const r32team=(s,mn)=>{ if(s[0]==='p'){ const g=s[2],pos=s[1]; return {t:SB[g]?SB[g][pos-1].team:null, conf:complete[g]}; }
-    return {t:thirdTeam[mn]||null, conf:allComplete, third:true}; };   // 3e confirmé seulement quand TOUTES les poules sont finies
-  function decide(mn,A,B){ let w=null;   // vainqueur projeté = plus forte proba du modèle
-    if(A.t&&B.t){ const pa=koWin(A.t,B.t), pb=1-pa; w=pa>=pb?A.t:B.t; A={...A,p:pa,fav:w===A.t}; B={...B,p:pb,fav:w===B.t}; }
-    teamAt[mn]={a:A,b:B}; win[mn]=w; }
-  R32.forEach(mt=>decide(mt.n, r32team(mt.a,mt.n), r32team(mt.b,mt.n)));
-  const adv=(mn,f1,f2)=>decide(mn, {t:win[f1]||null,conf:false}, {t:win[f2]||null,conf:false}); // vainqueurs KO = projection
-  R16.forEach((p,i)=>adv(89+i,p[0],p[1])); QF.forEach((p,i)=>adv(97+i,p[0],p[1]));
-  SF.forEach((p,i)=>adv(101+i,p[0],p[1])); adv(103,101,102);
-  const cell=c=>`<div class="tm ${c.conf?'':'proj'} ${c.third?'third':''}"><span>${c.t||'—'}</span>${c.p!=null?`<span class="pc ${c.fav?'fav':''}">${Math.round(c.p*100)}%</span>`:''}</div>`;
-  const card=mn=>{ const d=teamAt[mn]; return `<div class="brk-m"><div class="mn">M${mn}</div>${cell(d.a)}${cell(d.b)}</div>`; };
+  const ks=koState();
+  const cell=(n,side)=>{ const t=side==='a'?ks.tA[n]:ks.tB[n], r=KO.res[n], conf=side==='a'?ks.cA[n]:ks.cB[n];
+    const isWin = !!r && ks.win[n]===t && t!=null;
+    const sc = r? `<b class="kosc">${side==='a'?r[0]:r[1]}</b> ` : '';
+    let pc=''; if(!r && ks.tA[n] && ks.tB[n]){ const ph=koWin(ks.tA[n],ks.tB[n]); const p=side==='a'?ph:1-ph; pc=`<span class="pc ${ks.win[n]===t?'fav':''}">${Math.round(p*100)}%</span>`; }
+    return `<div class="tm ${conf?'':'proj'} ${isWin?'kowin':''}">${sc}<span>${t||'—'}</span>${pc}</div>`; };
+  const card=n=>`<button class="brk-m kobtn" data-n="${n}"><div class="mn">${KO_RNAME[n]==='Finale'?'Finale':'M'+n}</div>${cell(n,'a')}${cell(n,'b')}</button>`;
   const col=(title,ns)=>`<div class="brk-col"><div class="rnd">${title}</div>${ns.map(card).join('')}</div>`;
-  const champ=win[103];
-  return '<div class="brkleg">Projection live — qualifiés d’après les classements actuels, vainqueurs KO = <b>probabilité du modèle</b> (% = chance de passer ce tour, nul → tirs au but 50/50). <b>Gras</b> = qualifié confirmé (poule finie), <i>italique</i> = provisoire.'+
-    (champ?` · Champion projeté : <b class="champ">${champ}</b>`:'')+'</div>'+
+  const champ=ks.win[103];
+  return '<div class="brkleg"><b>Clique un match pour saisir le résultat.</b> <b>Gras</b> = équipe/résultat réel, <i>italique + %</i> = projeté (favori du modèle). Un nul en KO → choisis le qualifié aux tirs au but dans la saisie.'+
+    (champ?` · Champion ${ks.cW[103]?'':'projeté '}: <b class="champ">${champ}</b>`:'')+'</div>'+
     '<div class="brk">'+col('32es',R16.flat())+col('8es',R16.map((_,i)=>89+i))+
     col('Quarts',QF.map((_,i)=>97+i))+col('Demies',SF.map((_,i)=>101+i))+col('Finale',[103])+'</div>';
 }
@@ -1002,8 +1050,12 @@ function renderKO(){
   $('koTabs').innerHTML=tabs.map(([k,l])=>`<button class="gchip ${k===koTab?'on':''}" data-k="${k}">${l}</button>`).join('');
   $('koTabs').querySelectorAll('.gchip').forEach(b=>b.onclick=()=>{koTab=b.dataset.k;renderKO();});
   const nDone=Object.keys(GROUPS).filter(g=>groupStandings(g).complete).length;
-  $('koCtx').textContent=nDone+'/12 poules terminées · le tableau final se met à jour en continu (projection)';
+  const koPlayed=Object.keys(KO.res).length;
+  $('koCtx').textContent = nDone<12 ? (nDone+'/12 poules terminées · projection en continu')
+    : (koPlayed+'/32 matchs KO saisis · clique un match du bracket (ou onglet « 🏆 Phase finale » des Matchs) pour saisir résultat + pronos');
   $('koView').innerHTML = koTab==='groups'?renderGroupStandings():renderBracket();
+  if(koTab==='bracket') $('koView').querySelectorAll('.kobtn').forEach(b=>b.onclick=()=>{ selGroup='KO'; selId=+b.dataset.n; renderMatchList(); renderDetail();
+    const d=document.getElementById('detail'); if(d) d.scrollIntoView({behavior:'smooth',block:'center'}); });
 }
 function renderAll(){ syncParamsFromMain(); refreshCalib(); renderStandings(); renderMatchList();
   if(!detailBusy()) renderDetail();          // ne pas reconstruire le détail pendant/juste après une saisie
@@ -1139,7 +1191,7 @@ function renderCalib(){
 const LS='castrol_legends_state_v2';   // clé versionnée : ignore les sauvegardes de l'ancien schéma
 const SCHEMA=2;
 // NB : on NE persiste PAS les paramètres du modèle ici (source unique = simulateur principal)
-function serialize(){ return { v:SCHEMA, matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL, picks: BONUS_PICKS }; }
+function serialize(){ return { v:SCHEMA, matches: MATCHES.map(m=>({id:m.id,res:m.res,preds:m.preds})), bonus: BONUS_ACTUAL, picks: BONUS_PICKS, ko:{res:KO.res,win:KO.win,preds:KO.preds} }; }
 function saveLocal(){ try{ localStorage.setItem(LS, JSON.stringify(serialize())); }catch(e){} }
 // renvoie true si appliqué, false si schéma incompatible (ancienne version) -> évite la corruption
 function applyState(s){
@@ -1153,6 +1205,7 @@ function applyState(s){
     while(BONUS_ACTUAL.semis.length<4) BONUS_ACTUAL.semis.push(null); }
   // pronos bonus des joueurs édités (override des valeurs câblées) — additif, rétro-compatible
   if(s.picks && typeof s.picks==='object'){ Object.keys(s.picks).forEach(pl=>{ if(s.picks[pl]) BONUS_PICKS[pl]=s.picks[pl]; }); }
+  if(s.ko && typeof s.ko==='object'){ KO.res=s.ko.res||{}; KO.win=s.ko.win||{}; KO.preds=s.ko.preds||{}; }
   return true;
 }
 function loadLocal(){ try{ const s=JSON.parse(localStorage.getItem(LS)||'null'); if(s) applyState(s); }catch(e){} }
