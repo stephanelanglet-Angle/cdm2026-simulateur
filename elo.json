@@ -1,6 +1,6 @@
 {
   "_source": "eloratings.net",
-  "_updated": "2026-10-04",
+  "_updated": "2026-10-05",
   "elo": {
     "Mexique": 1890,
     "Corée du Sud": 1722,
@@ -13,15 +13,15 @@
     "Brésil": 2001,
     "Maroc": 1896,
     "Écosse": 1746,
-    "Haïti": 1586,
+    "Haïti": 1563,
     "Etats-Unis": 1786,
     "Paraguay": 1836,
     "Australie": 1786,
     "Turquie": 1781,
     "Allemagne": 1895,
-    "Equateur": 1857,
+    "Equateur": 1849,
     "Côte d'Ivoire": 1723,
-    "Curaçao": 1494,
+    "Curaçao": 1491,
     "Pays-Bas": 1974,
     "Japon": 1895,
     "Suède": 1759,
@@ -48,7 +48,7 @@
     "RD Congo": 1693,
     "Angleterre": 2144,
     "Croatie": 1861,
-    "Panama": 1646,
+    "Panama": 1654,
     "Ghana": 1512
   }
 }
